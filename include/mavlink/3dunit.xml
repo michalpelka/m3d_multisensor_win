@@ -1,0 +1,34 @@
+<?xml version='1.0'?>
+<mavlink>
+    <include>common.xml</include>
+     <dialect>2</dialect>
+    <messages>
+ 	 <message id="200" name="SET_ROTATION_VELOCITY">
+            <description>Sets a rotation velocity of 3d unit</description>
+            <field name="rpm" type="int16_t">velocity in RPM</field>
+            
+        </message>
+    <message id="201" name="LD_CAMERA_TRIGGER">
+      <description></description>
+      <field type="uint16_t" name="frequency" display="frequency">Requested frequency of shutter trigger. For oneshot, request 0 .</field>
+	  <field type="uint32_t" name="request_token" display="frequency">Token which will be returned with strobe message. Incremented with new images.</field>
+    </message>
+	<message id="202" name="LD_CAMERA_STROBE">
+      <description></description>
+      <field type="uint32_t" name="request_token" display="frequency">Token which will be returned with strobe message. Incremented with new images.</field>
+	  <field type="uint64_t" name="time_trigg_usec" units="us">Timestamp (micros since boot (when no PPS) or Unix epoch)</field>
+	  <field type="uint64_t" name="time_strob_usec" units="us">Timestamp (micros since boot (when no PPS) or Unix epoch)</field>
+	  
+    </message>
+	
+	<message id="203" name="UNIT_ENCODERS">
+      <description></description>
+      <field type="uint64_t" name="ts" display="ts" units="us">Hardware timestam</field>
+	  <field type="float" name="encoder0" units="radians">Encoder Channel 0</field>
+	  <field type="float" name="encoder1" units="radians">Encoder Channel 1</field>
+	  <field type="float" name="encoder2" units="radians">Encoder Channel 2</field>
+	  </message>
+	
+	uint64_t
+    </messages>
+</mavlink>
