@@ -223,6 +223,7 @@ public:
 //
         const auto dataHandler2 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc) {
             if (aggregation_deadline != std::chrono::time_point<std::chrono::system_clock>()) {
+                std::cout << "pc2.size()" << pc.size() << std::endl;
                 if (std::chrono::system_clock::now() < aggregation_deadline)
                 {
                     aggregated_pointclouds[1] += pc;
@@ -236,7 +237,7 @@ public:
                         pcl::io::savePCDFileBinary(std::to_string(timestamp) + "_pointcloud_raw_livox_1.pcd", aggregated_pointclouds[1]);
                         aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
                         std::cout << "============================================" << std::endl;
-                        std::cout << "Done aggregating" << std::endl;
+                        std::cout << "Done aggregating " << aggregated_pointclouds [1].size()<< std::endl;
                         std::cout << "============================================" << std::endl;
                         aggregated_pointclouds[1].clear();
                     }
@@ -258,7 +259,7 @@ public:
                         pcl::io::savePCDFileBinary(std::to_string(timestamp) + "_pointcloud_raw_livox_2.pcd", aggregated_pointclouds[2]);
                         aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
                         std::cout << "============================================" << std::endl;
-                        std::cout << "Done aggregating" << std::endl;
+                        std::cout << "Done aggregating " << aggregated_pointclouds[2].size() << std::endl;
                         std::cout << "============================================" << std::endl;
                         aggregated_pointclouds[2].clear();
                     }

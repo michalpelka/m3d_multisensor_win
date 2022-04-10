@@ -53,7 +53,7 @@ void livox_client::livox_sync_thread_worker()
 
         pcl::PointCloud<pcl::PointXYZINormal> pc;
         for (const auto packet : data_to_work){
-  
+
             const double packet_ts = packet.timestamp;
             encoder_with_timestamp encoder_reading;
             const double err = client->getEncoder(packet_ts, encoder_reading);
