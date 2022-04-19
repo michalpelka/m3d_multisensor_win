@@ -18,6 +18,12 @@ namespace health_server {
     void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data);
     void server_worker();
 };
+namespace file_server {
+    const std::string repo{ "data_root/" };
 
+    static const char* s_listen_on = "http://0.0.0.0:8002";
+    void fn(struct mg_connection* c, int ev, void* ev_data, void* fn_data);
+    void server_worker();
+};
 
 #endif //SRC_HEALTH_SERVER_H

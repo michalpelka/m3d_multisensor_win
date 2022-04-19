@@ -51,6 +51,7 @@
 
 namespace
 {
+	LadybugContext context{NULL};
 	std::string getWriteableDirectory()
 	{
 		std::string writeableDirectory;
@@ -94,8 +95,11 @@ void setPostProcessingOptions(LadybugContext context);
 
 bool captureLadybugImage(const std::string& directory)
 {
+
 	// Initialize context.
-	LadybugContext context;
+	if (context) {
+		handleError(ladybugDestroyContext(&context), "ladybugDestroyContext()");
+	}
 	handleError(ladybugCreateContext(&context));
 
 	// Initialize the first ladybug on the bus.
@@ -273,6 +277,7 @@ void handleError(LadybugError error, const char* message)
 {
 	if (error != LADYBUG_OK)
 	{
+
 		if (message == NULL)
 		{
 			printf("Error: Ladybug library reported - %s\n", ::ladybugErrorToString(error));
@@ -281,7 +286,6 @@ void handleError(LadybugError error, const char* message)
 		{
 			printf("Error: Ladybug library reported in %s - %s\n", message, ::ladybugErrorToString(error));
 		}
-
-		exit(1);
+		throw(std::exception());
 	}
 }

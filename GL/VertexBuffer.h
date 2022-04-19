@@ -6,6 +6,7 @@ class VertexBuffer
 public:
 
 	VertexBuffer(const void * data, unsigned int size);
+	void update(const void* data, unsigned int size);
 	void update();
 	~VertexBuffer();
 	void Bind() const;

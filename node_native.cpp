@@ -115,9 +115,7 @@ public:
             pt.put("status.livox." + id + ".info.status.status_code.lidar_error_code.time_sync_status", lidars_ptr[i].info.status.status_code.lidar_error_code.time_sync_status);
             pt.put("status.livox." + id + ".info.status.status_code.lidar_error_code.system_status", lidars_ptr[i].info.status.status_code.lidar_error_code.system_status);
             pt.put("status.livox." + id + ".info.type", lidars_ptr[i].info.type);
-
         }
-
 
         {
             std::lock_guard<std::mutex> lck(tcp_client_status);
@@ -234,7 +232,7 @@ public:
 
                         using namespace std::chrono;
                         int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
-                        pcl::io::savePCDFileBinary(std::to_string(timestamp) + "_pointcloud_raw_livox_1.pcd", aggregated_pointclouds[1]);
+                        pcl::io::savePCDFileBinary(file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_livox_1.pcd", aggregated_pointclouds[1]);
                         aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
                         std::cout << "============================================" << std::endl;
                         std::cout << "Done aggregating " << aggregated_pointclouds [1].size()<< std::endl;
@@ -256,7 +254,7 @@ public:
 
                         using namespace std::chrono;
                         int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
-                        pcl::io::savePCDFileBinary(std::to_string(timestamp) + "_pointcloud_raw_livox_2.pcd", aggregated_pointclouds[2]);
+                        pcl::io::savePCDFileBinary(file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_livox_2.pcd", aggregated_pointclouds[2]);
                         aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
                         std::cout << "============================================" << std::endl;
                         std::cout << "Done aggregating " << aggregated_pointclouds[2].size() << std::endl;
@@ -318,7 +316,9 @@ public:
 
         std::thread tcp_unit_comm_thread(&native_sync::tcpThread, this);
         health_server::setStatusHandler(status_string);
-        std::thread http_thread(health_server::server_worker);
+        std::thread http_thread1(health_server::server_worker);
+        std::thread http_thread2(file_server::server_worker);
+
         const auto aggregate_data =[&](const std::string& t){
             using namespace std::chrono;
             auto tt = t;
@@ -335,9 +335,37 @@ public:
         health_server::setTriggerHandler(aggregate_data, "scan");
 
 #ifdef WITH_LADYBUG
+
+        const auto aggregate_data_ladybug = [&](const std::string& t) {
+            using namespace std::chrono;
+            auto tt = t;
+            aggregation_deadline = system_clock::now() + std::chrono::seconds(std::atoi(tt.c_str()));
+
+            int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
+
+            try {
+                int result = captureLadybugImage(file_server::repo +std::to_string(timestamp) + "_photo_");
+                return std::to_string(result);
+            }
+            catch (std::exception& err) {
+                return std::string(err.what());
+            }
+            return std::string("failed");
+
+        };
+
+        health_server::setTriggerHandler(aggregate_data_ladybug, "scan_photo_block");
+
+
         const auto take_photo = [&](const std::string& t) {
-            int result = captureLadybugImage("");
-            return std::to_string(result);
+            try {
+                int result = captureLadybugImage(file_server::repo + "photo_");
+                return std::to_string(result);
+            }
+            catch (std::exception & err) {
+                return std::string(err.what());
+            }
+            return std::string("failed");
         };
         health_server::setTriggerHandler(take_photo, "ladybug");
 #endif
@@ -346,7 +374,19 @@ public:
                 client1->sendCommand("RRR\n");
             }
         };
-        health_server::setTriggerHandler(reset1, "resetBoard");
+
+        const auto fun_rotate = [&](const std::string& t) {
+            client1->sendCommand("mvel "+t+"\n");
+            
+        };
+        const auto fun_stop = [&](const std::string& t) {
+             client1->sendCommand("moff\n");
+            
+        };
+        health_server::setTriggerHandler(reset1,     "resetBoard");
+        health_server::setTriggerHandler(fun_rotate, "mvel");
+        health_server::setTriggerHandler(fun_stop,   "moff");
+
 
         for (;;) {
             std::this_thread::sleep_for(std::chrono::seconds(1));

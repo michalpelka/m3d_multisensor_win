@@ -52,6 +52,7 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			GL/Texture.cpp
 			GL/VertexBuffer.cpp
 			GL/Shader.cpp
+			GL/shaders_code.cpp
 			GL/VertexArray.cpp
 			GL/VertexBufferLayout.cpp
 			# imgui
@@ -59,6 +60,8 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			3rd/imgui/imgui_draw.cpp 3rd/imgui/imgui_widgets.cpp
 			3rd/imgui/imgui_tables.cpp
 			3rd/imgui/backends/imgui_impl_opengl3.cpp 3rd/imgui/backends/imgui_impl_glfw.cpp
+			#ImViewGizmo
+			3rd/ImGuizmo/ImGuizmo.cpp
 			)
 
 
@@ -123,7 +126,7 @@ target_link_libraries(node_native
 MESSAGE(${PCL_LIBRARIES})
 MESSAGE(INFO ${PCL_COMMON_LIBRARY})
 IF (${BUILD_GL_VIEVER} STREQUAL "ON")
-	add_executable (gl_viever gl_viewer/gl_viewer.cpp)
+	add_executable (gl_viever gl_viewer/gl_viewer.cpp gl_viewer/structs.cpp)
 	#add_dependencies(node_native ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 	target_link_libraries(gl_viever
 			${PCL_COMMON_LIBRARY}
