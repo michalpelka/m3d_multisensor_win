@@ -32,8 +32,7 @@ namespace calib_struct{
 
     std::vector<Sophus::Vector6f> initializeCalib(const std::string& fn);
     
-    pcl::PointCloud<pcl::PointXYZI> createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib);
-
+    pcl::PointCloud<pcl::PointXYZINormal> createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib);
 
     struct plane {
         Eigen::Matrix4f matrix{ Eigen::Matrix4f::Identity() };
@@ -47,13 +46,41 @@ namespace calib_struct{
 
 
         Eigen::Matrix4f getGizmo() const {
-            return matrix;// Eigen::Matrix4f::Identity();// / *rotation;
+            return matrix;
         }
 
         void setGizmo(Eigen::Matrix4f& m)
         {
             matrix = m;
         }
+
+        Eigen::Vector4d getABCD() const {
+            const double a = matrix(0,2);
+            const double b = matrix(1,2);
+            const double c = matrix(2,2);
+            const double d = -matrix(0,3) * a - matrix(1,3) * b - matrix(2,3) * c;
+            return Eigen::Vector4d  {a,b,c,d};
+        }
+
+        void setABCD(const Eigen::Vector4f &abcd){
+
+            // get origin
+            const double a = matrix(0,2);
+            const double b = matrix(1,2);
+            const double c = matrix(2,2);
+            const double d = -matrix(0,3) * a - matrix(1,3) * b - matrix(2,3) * c;
+
+            Eigen::Vector3f center =  matrix.block<3, 1>(0, 3);
+
+            matrix = Eigen::Matrix4f::Identity();
+            Eigen::Vector3f z = abcd.head<3>();
+            z.normalize();
+            matrix.block<3, 3>(0, 0).col(2) = z;
+            matrix.block<3, 3>(0, 0).col(1) = z.cross(Eigen::Vector3f{ 1,0,0 });
+            matrix.block<3, 3>(0, 0).col(0) = z.cross(Eigen::Vector3f{ 0,0,1 });
+            matrix.block<3, 1>(0, 3) = center + z * (abcd.w() - d);
+        }
+
     };
 
     void savePlanes(std::vector<plane>& planes, const std::string& fn);

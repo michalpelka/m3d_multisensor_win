@@ -20,6 +20,10 @@ else()
 	SET(LADYBUG_LIBS ${LADYBUG_SDK}/lib64/ladybug.lib ladybug_capture)
 endif()
 
+find_package (Eigen3 REQUIRED)
+INCLUDE_DIRECTORIES ( "${EIGEN3_INCLUDE_DIR}" )
+message("EIGEN3_INCLUDE_DIR" ${EIGEN3_INCLUDE_DIR})
+
 IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 	find_package(OpenGL REQUIRED)	
 	message("Building BUILD_GL_VIEVER")
@@ -30,8 +34,21 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 		SET(GLEW_LIBRARIES ${CMAKE_SOURCE_DIR}/3rd_precompiled_win64/glew-2.1.0/lib/Release/x64/glew32.lib) # static GLEW library
 		SET(GLFW_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/3rd_precompiled_win64/glfw-3.3.6.bin.WIN64/include)
 		SET(GLFW_LIBRARIES ${CMAKE_SOURCE_DIR}/3rd_precompiled_win64/glfw-3.3.6.bin.WIN64/lib-vc2019/glfw3.lib) # static GLFW library
+		SET(OPENGL_LIBRARIES opengl32)
 	else()
-		message(FATAL "Win32 is only supported")
+		find_package(Ceres REQUIRED)
+		find_package(OpenGL REQUIRED)
+		find_package(glfw3 REQUIRED)
+		find_package(glm REQUIRED)
+		find_package(GLEW REQUIRED)
+		SET(GLFW_LIBRARIES glfw)
+		if (CERES_FOUND)
+
+		endif()
+		if (GLEW_FOUND)
+			include_directories(${GLEW_INCLUDE_DIRS})
+			link_libraries(${GLEW_LIBRARIES})
+		endif()
 	endif()
 
 	# glm is header only
@@ -91,7 +108,7 @@ add_library(m3d_clients_livox STATIC clients/livox_client.cpp livox/lds_lidar.cp
 add_library(m3d_clients_VLP  STATIC clients/velodyne_client.cpp velodyne/PacketDecoder.cpp velodyne/PacketDriver.cpp)
 
 include_directories(3rd/mongoose)
-add_library(mongoose  STATIC 3rd/mongoose/mongoose.c)
+add_library(mongoose STATIC 3rd/mongoose/mongoose.c)
 
 #xsens
 #include_directories(3rd/xsens/xspublic/ 3rd/xsens/xspublic/xscommon/ 3rd/xsens/xspublic/xscontroller/ xsens/xspublic/xstypes/)
@@ -121,6 +138,8 @@ target_link_libraries(node_native
 		${LADYBUG_LIBS}
 		livox_sdk_static
 		mongoose)
+# target_compile_features(node_native PUBLIC cxx_std_14)
+
 #m3d_clients_XDK
 
 MESSAGE(${PCL_LIBRARIES})
@@ -134,8 +153,12 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			${PCL_OCTREE_LIBRARY}
 			${Boost_LIBRARIES}	
 			${LADYBUG_LIBS}
-			${GLEW_LIBRARIES}
+			${GLEW_LIBRARIES} 
 			${GLFW_LIBRARIES}
-			GL_Codes opengl32 
+			${OPENGL_LIBRARIES}
+			GL_Codes 
+			${CMAKE_DL_LIBS}
+			${CERES_LIBRARIES}
 			)
+	# target_compile_features(gl_viever PUBLIC cxx_std_14)
 endif()

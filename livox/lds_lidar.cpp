@@ -55,6 +55,9 @@ LdsLidar::LdsLidar() {
     /** Unallocated state */
     lidars_[i].connect_state = kConnectStateOff;
   }
+  for (int i =0; i < kMaxLidarCount; i++){
+     global_timestamp[i] = -1;
+  }
 }
 
 LdsLidar::~LdsLidar() {

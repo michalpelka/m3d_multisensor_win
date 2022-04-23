@@ -13,6 +13,8 @@
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "ImGuizmo/ImGuizmo.h"
 #include "structs.h"
+#include <ceres/ceres.h>
+#include "cost_fun.h"
 
 std::vector<Sophus::Vector6f> extrinsic_calib_vec;
 std::vector<calib_struct::plane> calibration_planes;
@@ -28,6 +30,13 @@ bool drawing_buffer_dirty = true;
 glm::vec3 view_translation{ 0,0,-30 };
 
 
+template <typename T> Eigen::Matrix<T,4,1>getPlaneCoefFromSE3(const Eigen::Matrix<T,4,4>& SE3){
+    const T a = -SE3(0,2);
+    const T b = -SE3(1,2);
+    const T c = -SE3(2,2);
+    const T d = SE3(0,3) * a + SE3(1,3) * b + SE3(2,3) * c;
+    return Eigen::Matrix<T,4,1> {a,b,c,d};
+}
 
 void cursor_calback(GLFWwindow* window, double xpos, double ypos)
 {
@@ -111,13 +120,13 @@ int main(int argc, char** argv) {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZINormal>);
-    pcl::io::loadPCDFile<pcl::PointXYZINormal>("D:/1649933930_pointcloud_raw_livox_1.pcd",*cloud2);
+    pcl::io::loadPCDFile<pcl::PointXYZINormal>("/mnt/540C28560C283580/1649933930_pointcloud_raw_livox_1.pcd",*cloud2);
     int len2 = 0; 
     std::shared_ptr<float[]> data2 = calib_struct::pclToBuffer(cloud2, len2, 1.0f);
     std::shared_ptr<calib_struct::KeyFrame> k2 = std::make_shared<calib_struct::KeyFrame>(data2, len2, Eigen::Matrix4d::Identity(),2);
 
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZINormal>);
-    pcl::io::loadPCDFile<pcl::PointXYZINormal>("D:/1649933930_pointcloud_raw_livox_2.pcd", *cloud1);
+    pcl::io::loadPCDFile<pcl::PointXYZINormal>("/mnt/540C28560C283580/1649933930_pointcloud_raw_livox_2.pcd", *cloud1);
     int len1 = 0;
     std::shared_ptr<float[]> data1 = calib_struct::pclToBuffer(cloud1, len1, 1.0f);
     std::shared_ptr<calib_struct::KeyFrame> k1 = std::make_shared<calib_struct::KeyFrame>(data1, len1, Eigen::Matrix4d::Identity(), 1);
@@ -161,7 +170,7 @@ int main(int argc, char** argv) {
                 shader.setUniformMat4f("u_MVP", proj * model_rotation_2 * mat);
                 renderer.Draw(va_co, ib_co, shader, GL_LINES);
 
-                shader.setUniformMat4f("u_MVP", proj * model_rotation_2 * mat * glm::scale(glm::mat4(1.0f), glm:: (p.size.x(), p.size.y(), 1.0f)));
+                shader.setUniformMat4f("u_MVP", proj * model_rotation_2 * mat * glm::scale(glm::mat4(1.0f), glm::vec3 (p.size.x(), p.size.y(), 1.0f)));
                 renderer.Draw(va_plane, ib_plane, shader, GL_TRIANGLES);
             }
         }
@@ -175,7 +184,7 @@ int main(int argc, char** argv) {
         shader_pc_head.setUniformMat4f("u_HEAD", uniform_head_matrix);
         shader_pc_head.setUniform4f("u_COLORPC", 1, 1, 0, 1);
         shader_pc_head.setUniform1f("u_AngOffset", 0);
-        renderer.DrawArray(k2->va, shader_pc_head, GL_POINTS, k2->len / 6);
+        renderer.DrawArray(k1->va, shader_pc_head, GL_POINTS, k2->len / 6);
 
 
         map_uniform_head_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[1]).matrix();
@@ -185,8 +194,7 @@ int main(int argc, char** argv) {
         shader_pc_head.setUniformMat4f("u_HEAD", uniform_head_matrix);
         shader_pc_head.setUniform4f("u_COLORPC", 1, 0, 0, 1);
         shader_pc_head.setUniform1f("u_AngOffset", 0);
-        renderer.DrawArray(k1->va, shader_pc_head, GL_POINTS, k1->len / 6);
-
+        renderer.DrawArray(k2->va, shader_pc_head, GL_POINTS, k1->len / 6);
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         ImGui::Begin("Calibration Demo");
@@ -208,8 +216,8 @@ int main(int argc, char** argv) {
             calib_struct::saveConfig(extrinsic_calib_vec, "calib.txt");
         }
         if (ImGui::Button("ExportPDC")) {
-            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
+            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0]);
+            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1]);
             pcl::io::savePCDFileBinary("test1_pcd.pcd", pcd1);
             pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd2);
         }
@@ -220,12 +228,6 @@ int main(int argc, char** argv) {
         ImGui::SameLine();
         if (ImGui::Button("SavePlanes")) {
             calib_struct::savePlanes(calibration_planes, "planes.txt");
-        }
-        if (ImGui::Button("ExportPDC")) {
-            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
-            pcl::io::savePCDFileBinary("test1_pcd.pcd", pcd1);
-            pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd2);
         }
         for (int i = 0; i < calibration_planes.size(); i++)
         {
@@ -248,20 +250,22 @@ int main(int argc, char** argv) {
             snprintf(b, 256, "export plane %d", i);
             if (ImGui::Button(b)) {
 
-                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
-                std::vector <pcl::PointCloud<pcl::PointXYZI>> pcds{ pcd1,pcd2 };
+                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0]);
+                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1]);
+                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ pcd1,pcd2 };
+                pcl::io::savePCDFileBinary("test1_pcd.pcd", pcd1);
+                pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd2);
 
-                pcl::PointCloud<pcl::PointXYZL> cloud;
                 
                 auto plane_se3 = calibration_planes[i].matrix;
                 auto plane_size = calibration_planes[i].size;
-
                 auto plane_se3_inv = plane_se3.inverse();
+
                 Eigen::Vector3f plane_vec_inv = plane_se3_inv.block<1, 3>(1, 3);
                 for (int j = 0; j < pcds.size(); j++)
                 {
                     auto& pcd = pcds[j];
+                    pcl::PointCloud<pcl::PointXYZL> cloud;
                     cloud.reserve(cloud.size() + pcd.size());
                     for (int i = 0; i < pcd.size(); i++) {
                         //Eigen::Vector3f p = pcd[i].getArray3fMap() - plane_vec_inv;
@@ -269,23 +273,23 @@ int main(int argc, char** argv) {
                         pi.label = j;
                         Eigen::Vector4f p = pcd[i].getArray4fMap();
                         pi.getArray4fMap() = plane_se3_inv * p ;
-                        if (abs(pi.x) < plane_size.x() && abs(pi.y) < plane_size.y() && abs(pi.z) < 1.0) {
+                        if (abs(pi.x) < plane_size.x() && abs(pi.y) < plane_size.y() && abs(pi.z) < 2.0) {
                             cloud.push_back(pi);
                         }
 
                     }
+                    snprintf(b, 256, "cloud_plane%d_cloud%d.pcd", i,j);
+                    pcl::io::savePCDFileBinary(b, cloud);
                 }
-                snprintf(b, 256, "cloud_plane%d.pcd", i);
-                pcl::io::savePCDFileBinary(b, cloud);
+
             }
             snprintf(b, 256, "svd %d", i);
             ImGui::SameLine();
             if (ImGui::Button(b)) {
 
-
-                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
-                std::vector <pcl::PointCloud<pcl::PointXYZI>> pcds{ pcd1,pcd2 };
+                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0]);
+                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1]);
+                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ pcd1,pcd2 };
 
                 std::vector<Eigen::Vector4f> cloud;
 
@@ -302,7 +306,7 @@ int main(int argc, char** argv) {
                     for (int i = 0; i < pcd.size(); i++) {
                         Eigen::Vector4f p = pcd[i].getArray4fMap();
                         Eigen::Vector4f pi = plane_se3_inv * p;
-                        if (abs(pi.x()) < plane_size.x() && abs(pi.y()) < plane_size.y() && abs(pi.z()) < 1.0) {
+                        if (abs(pi.x()) < plane_size.x() && abs(pi.y()) < plane_size.y() && abs(pi.z()) < 0.5) {
                             cloud.push_back(p);
                         }
                     }
@@ -323,6 +327,97 @@ int main(int argc, char** argv) {
         }
         if (ImGui::Button("add_plane")) {
             calibration_planes.resize(calibration_planes.size() + 1);
+        }
+        if (ImGui::Button("calib")){
+            ceres::Problem problem;
+            std::vector<Eigen::Vector4d> plane_params;
+            std::vector<Sophus::SE3d> laser_params;
+
+            // params
+            for (int i =0; i < calibration_planes.size(); i++ ){
+                //Eigen::Matrix4d m = calibration_planes[i].matrix.cast<double>();
+                //plane_params.push_back(Sophus::SE3d::fitToSE3(m.inverse()));
+                Eigen::Vector4d c = calibration_planes[i].getABCD();
+                plane_params.push_back(c);
+            }
+            for (int i =0; i < calibration_planes.size(); i++ ) {
+                problem.AddParameterBlock(plane_params[i].data(), 4, new LocalParameterizationPlane());
+                problem.SetParameterBlockConstant(plane_params[i].data());
+            }
+
+            for (int i =0; i < extrinsic_calib_vec.size(); i++ ) {
+                auto sp = Sophus::SE3f::exp(extrinsic_calib_vec[i]);
+                std::cout << "sp :  " << sp.matrix() << std::endl;
+                laser_params.push_back(sp.cast<double>());
+            }
+            for (int i =0; i < laser_params.size(); i++ ) {
+                problem.AddParameterBlock(laser_params[i].data(), Sophus::SE3d::num_parameters, new LocalParameterizationSE3());
+                ceres::CostFunction *cost_function = LockTranslation::Create();
+                problem.AddResidualBlock(cost_function, nullptr, laser_params[i].data());
+            }
+
+            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0]);
+            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1]);
+            std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ pcd1,pcd2 };
+            std::vector <pcl::PointCloud<pcl::PointXYZINormal>::Ptr> raw_pcds{ cloud1,cloud2 };
+
+            pcl::PointCloud<pcl::PointXYZINormal> pc;
+            // residuals
+            double res = 0;
+            for (int i = 0; i < pcds.size(); i++)
+            {
+                const auto & pcd = pcds[i];
+                const auto & raw_pcd = raw_pcds[i];
+
+                for (int j =0; j < plane_params.size(); j++){
+
+                    auto plane_size = calibration_planes[j].size;
+                    auto plane_se3_inv =  calibration_planes[j].matrix.inverse().cast<double>();
+                    Eigen::Vector3d plane_vec_inv = plane_se3_inv.block<1, 3>(1, 3);
+
+                    for (int k =0; k < pcd.size(); k++){
+                        Eigen::Vector4f p_float = pcd[k].getArray4fMap();
+                        Eigen::Vector4d pi = plane_se3_inv * p_float.cast<double>();
+
+                        if (abs(pi.x()) < plane_size.x() && abs(pi.y()) < plane_size.y() && abs(pi.z()) < 0.5) {
+
+                            auto ppi = raw_pcd->at(k);
+                            ppi.getVector4fMap() = pi.cast<float>();
+                            pc.push_back(ppi);
+
+                            double angle =raw_pcd->at(k).normal_x;
+                            ceres::LossFunction *loss = new ceres::CauchyLoss(0.25);
+                            Eigen::Vector4f raw_point = raw_pcd->at(k).getArray4fMap();
+                            ceres::CostFunction *cost_function =
+                                    LaserSE3AgainstPlane::Create(raw_point.cast<double>(),angle);
+
+                            LaserSE3AgainstPlane l(raw_point.cast<double>(),angle);
+                            problem.AddResidualBlock(cost_function, loss, plane_params[j].data(), laser_params[i].data());
+                            //std::exit(1);
+                        }
+                    }
+                }
+            }
+            std::cout << "res :  " << res << std::endl;
+            pcl::io::savePCDFile("/tmp/pcd.pcd", pc);
+
+
+
+//
+            ceres::Solver::Options options;
+            options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+            options.minimizer_progress_to_stdout = true;
+            options.max_num_iterations = 50;
+            ceres::Solver::Summary summary;
+            ceres::Solve(options, &problem, &summary);
+            std::cout << summary.FullReport() << "\n";
+            for (int i = 0; i < pcds.size(); i++){
+                extrinsic_calib_vec[i] = laser_params[i].log().cast<float>();
+            }
+            for (int i = 0; i < calibration_planes.size(); i++){
+                calibration_planes[i].setABCD(plane_params[i].cast<float>());
+            }
+
         }
 
         ImGui::End();

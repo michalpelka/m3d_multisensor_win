@@ -48,7 +48,7 @@ std::vector<Sophus::Vector6f> calib_struct::initializeCalib() {
     calibration2.block<3, 3>(0, 0) = (Eigen::AngleAxisf((-14.5 * M_PI / 180.0), Eigen::Vector3f::UnitY()) *
         Eigen::AngleAxisf(M_PI / 2.0, Eigen::Vector3f::UnitX())).toRotationMatrix();
 
-    return { Sophus::SE3f::fitToSE3(calibration1).log(),Sophus::SE3f::fitToSE3(calibration2).log(), };
+    return { Sophus::SE3f::fitToSE3(calibration2).log(),Sophus::SE3f::fitToSE3(calibration1).log(), };
 }
 
 std::vector<Sophus::Vector6f> calib_struct::initializeCalib(const std::string& fn) {
@@ -69,9 +69,9 @@ std::vector<Sophus::Vector6f> calib_struct::initializeCalib(const std::string& f
     return r;
 }
 
-pcl::PointCloud<pcl::PointXYZI> calib_struct::createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib)
+pcl::PointCloud<pcl::PointXYZINormal> calib_struct::createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib)
 {
-    pcl::PointCloud<pcl::PointXYZI> pc;
+    pcl::PointCloud<pcl::PointXYZINormal> pc;
     const Eigen::Matrix4f calib_mat{ Sophus::SE3f::exp(calib).matrix() };
     pc.resize(raw->size());
     for (int i = 0; i < raw->size(); i++)
@@ -85,6 +85,7 @@ pcl::PointCloud<pcl::PointXYZI> calib_struct::createTransformedPc(const pcl::Poi
         const Eigen::Vector4f p{ raw_point.getArray4fMap() };
         pc[i].getArray4fMap() = rot_angle.transpose() * calib_mat * p;
         pc[i].intensity = raw_point.intensity;
+        pc[i].normal_x = angle;
     }
     return pc;
 }
