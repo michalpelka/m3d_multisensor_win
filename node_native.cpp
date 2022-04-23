@@ -38,6 +38,7 @@ Eigen::Affine3f getVelodyne1(){
     rot0.rotate(Eigen::AngleAxisf(-M_PI/2, Eigen::Vector3f::UnitZ()));
 
     Eigen::Affine3f rot1 (Eigen::Affine3f::Identity());
+    Eigen::Affine3f rot1 (Eigen::Affine3f::Identity());
     rot1.translate(Eigen::Vector3f (0, 0.003542, 0.072236));
     rot1.rotate(Eigen::Quaternionf(-0.509959, -0.391302, -0.466336,0.607746));
     return rot1*rot0;

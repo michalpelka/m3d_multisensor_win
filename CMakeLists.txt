@@ -79,6 +79,7 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			3rd/imgui/backends/imgui_impl_opengl3.cpp 3rd/imgui/backends/imgui_impl_glfw.cpp
 			#ImViewGizmo
 			3rd/ImGuizmo/ImGuizmo.cpp
+			3rd/stb_image.h
 			)
 
 

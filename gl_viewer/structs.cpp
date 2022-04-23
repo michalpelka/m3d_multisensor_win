@@ -48,7 +48,11 @@ std::vector<Sophus::Vector6f> calib_struct::initializeCalib() {
     calibration2.block<3, 3>(0, 0) = (Eigen::AngleAxisf((-14.5 * M_PI / 180.0), Eigen::Vector3f::UnitY()) *
         Eigen::AngleAxisf(M_PI / 2.0, Eigen::Vector3f::UnitX())).toRotationMatrix();
 
-    return { Sophus::SE3f::fitToSE3(calibration2).log(),Sophus::SE3f::fitToSE3(calibration1).log(), };
+    Eigen::Matrix4f calibration3 = Eigen::Matrix4f::Identity();
+    calibration3.block<3, 3>(0, 0) = Eigen::AngleAxisf((-0.0 * M_PI / 180.0), Eigen::Vector3f::UnitZ()).toRotationMatrix();
+
+
+    return { Sophus::SE3f::fitToSE3(calibration2).log(),Sophus::SE3f::fitToSE3(calibration1).log(),Sophus::SE3f::fitToSE3(calibration3).log() };
 }
 
 std::vector<Sophus::Vector6f> calib_struct::initializeCalib(const std::string& fn) {

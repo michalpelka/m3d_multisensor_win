@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Renderer.h"
-//#include <opencv2/opencv.hpp>
-
+#ifdef WITH_OPENCV
+#include <opencv2/opencv.hpp>
+#endif
 class Texture
 {
 private:
@@ -16,6 +17,7 @@ public:
     Texture(const cv::Mat& image);
     void update(const cv::Mat& image);
 #endif
+    Texture(const std::string& path);
 	~Texture();
 
 	void Bind(unsigned int slot = 0) const;

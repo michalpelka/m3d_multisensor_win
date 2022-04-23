@@ -66,6 +66,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
+
 int main(int argc, char** argv) {
     calibration_planes.resize(1);
     //extrinsic_calib_vec = { Sophus::Vector6f::Zero(),Sophus::Vector6f::Zero() };
@@ -113,24 +114,28 @@ int main(int argc, char** argv) {
     Shader shader(shader_simple_v, shader_simple_f);
     Shader shader_pc(shader_pc_intensity_v, shader_pc_intensity_f);
     Shader shader_pc_head(shader_pc_intensity_head_v, shader_pc_intensity_f);
+    Shader shader_pc_head_spherical_img(shader_pc_spherical_head_v, shader_pc_spherical_f);
+
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    std::string fn = "/media/michal/ext/data_root/1650712239";
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZINormal>);
-    pcl::io::loadPCDFile<pcl::PointXYZINormal>("/mnt/540C28560C283580/1649933930_pointcloud_raw_livox_1.pcd",*cloud2);
+    pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn+"_pointcloud_raw_livox_1.pcd",*cloud2);
     int len2 = 0; 
     std::shared_ptr<float[]> data2 = calib_struct::pclToBuffer(cloud2, len2, 1.0f);
     std::shared_ptr<calib_struct::KeyFrame> k2 = std::make_shared<calib_struct::KeyFrame>(data2, len2, Eigen::Matrix4d::Identity(),2);
 
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZINormal>);
-    pcl::io::loadPCDFile<pcl::PointXYZINormal>("/mnt/540C28560C283580/1649933930_pointcloud_raw_livox_2.pcd", *cloud1);
+    pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn+"_pointcloud_raw_livox_2.pcd", *cloud1);
+
     int len1 = 0;
     std::shared_ptr<float[]> data1 = calib_struct::pclToBuffer(cloud1, len1, 1.0f);
     std::shared_ptr<calib_struct::KeyFrame> k1 = std::make_shared<calib_struct::KeyFrame>(data1, len1, Eigen::Matrix4d::Identity(), 1);
-
+    int shader_program_no = 1;
     
     int plane_edited = 0;
     while (!glfwWindowShouldClose(window)) {
@@ -176,29 +181,63 @@ int main(int argc, char** argv) {
         }
 
         glm::mat4 uniform_head_matrix;
+        glm::mat4 uniform_ladybug_matrix;
+
         Eigen::Map<Eigen::Matrix4f> map_uniform_head_matrix(&uniform_head_matrix[0][0]);
-        map_uniform_head_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[0]).matrix();
+        Eigen::Map<Eigen::Matrix4f> map_uniform_ladybug_matrix(&uniform_ladybug_matrix[0][0]);
+
+
+
+        Texture tex (fn+"_ladybugPostProcessing-panoramic-0-radius_50.000000.jpg");
+
         //map_uniform_head_matrix.block<3, 3>(0, 0) = Eigen::AngleAxisf(-M_PI/2.0, Eigen::Vector3f::UnitX()).toRotationMatrix();
-        shader_pc_head.Bind();
-        shader_pc_head.setUniformMat4f("u_MVPPC", proj * model_rotation_2 );
-        shader_pc_head.setUniformMat4f("u_HEAD", uniform_head_matrix);
-        shader_pc_head.setUniform4f("u_COLORPC", 1, 1, 0, 1);
-        shader_pc_head.setUniform1f("u_AngOffset", 0);
-        renderer.DrawArray(k1->va, shader_pc_head, GL_POINTS, k2->len / 6);
+        if (shader_program_no == 0) {
+            shader_pc_head.Bind();
+            map_uniform_head_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[0]).matrix();
+            shader_pc_head.setUniformMat4f("u_MVPPC", proj * model_rotation_2);
+            shader_pc_head.setUniformMat4f("u_HEAD", uniform_head_matrix);
+            shader_pc_head.setUniform4f("u_COLORPC", 1, 1, 0, 1);
+            shader_pc_head.setUniform1f("u_AngOffset", 0);
+            renderer.DrawArray(k1->va, shader_pc_head, GL_POINTS, k2->len / 6);
 
+            map_uniform_head_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[1]).matrix();
+            shader_pc_head.setUniformMat4f("u_MVPPC", proj * model_rotation_2);
+            shader_pc_head.setUniformMat4f("u_HEAD", uniform_head_matrix);
+            shader_pc_head.setUniform4f("u_COLORPC", 1, 0, 0, 1);
+            shader_pc_head.setUniform1f("u_AngOffset", 0);
+            renderer.DrawArray(k2->va, shader_pc_head, GL_POINTS, k1->len / 6);
 
-        map_uniform_head_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[1]).matrix();
-        //map_uniform_head_matrix.block<3, 3>(0, 0) = (Eigen::AngleAxisf((-14.5*M_PI/180.0), Eigen::Vector3f::UnitY())*
-        //    Eigen::AngleAxisf(M_PI / 2.0, Eigen::Vector3f::UnitX())).toRotationMatrix();
-        shader_pc_head.setUniformMat4f("u_MVPPC", proj * model_rotation_2);
-        shader_pc_head.setUniformMat4f("u_HEAD", uniform_head_matrix);
-        shader_pc_head.setUniform4f("u_COLORPC", 1, 0, 0, 1);
-        shader_pc_head.setUniform1f("u_AngOffset", 0);
-        renderer.DrawArray(k2->va, shader_pc_head, GL_POINTS, k1->len / 6);
+        }
+        if (shader_program_no == 1) {
+            shader_pc_head_spherical_img.Bind();
+            tex.Bind(1);
+            shader_pc_head_spherical_img.setUniform1i("u_Texture", 1);
+            map_uniform_head_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[0]).matrix();
+            map_uniform_ladybug_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[2]).matrix();
+            shader_pc_head_spherical_img.setUniformMat4f("u_MVPPC", proj * model_rotation_2);
+            shader_pc_head_spherical_img.setUniformMat4f("u_HEAD", uniform_head_matrix);
+            shader_pc_head_spherical_img.setUniformMat4f("u_LADYBUG", uniform_ladybug_matrix);
+
+            shader_pc_head_spherical_img.setUniform4f("u_COLORPC", 1, 1, 0, 1);
+            shader_pc_head_spherical_img.setUniform1f("u_AngOffset", 0);
+            renderer.DrawArray(k1->va, shader_pc_head_spherical_img, GL_POINTS, k2->len / 6);
+
+            map_uniform_head_matrix = Sophus::SE3f::exp(extrinsic_calib_vec[1]).matrix();
+            shader_pc_head_spherical_img.setUniformMat4f("u_MVPPC", proj * model_rotation_2);
+            shader_pc_head_spherical_img.setUniformMat4f("u_HEAD", uniform_head_matrix);
+            shader_pc_head_spherical_img.setUniform4f("u_COLORPC", 1, 0, 0, 1);
+            shader_pc_head_spherical_img.setUniform1f("u_AngOffset", 0);
+            renderer.DrawArray(k2->va, shader_pc_head_spherical_img, GL_POINTS, k1->len / 6);
+        }
+
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         ImGui::Begin("Calibration Demo");
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        //ImGui::Image((ImTextureID)tex.getMRendererId(), ImVec2(0.1*tex.GetWidth(),0.1*tex.GetHeight()));
+        const char* items[] = { "ShaderIntensity", "ShaderSpherical", "ShaderPerspetive"};
+        ImGui::Combo("Shader", &shader_program_no,items,3);
+
         for (int i = 0; i < extrinsic_calib_vec.size(); i++) {
             ImGui::Text("Calib %d:", i);
             ImGui::DragFloat3(("calib_r" + std::to_string(i)).c_str(), extrinsic_calib_vec[i].data(), 0.001f);
@@ -401,9 +440,6 @@ int main(int argc, char** argv) {
             std::cout << "res :  " << res << std::endl;
             pcl::io::savePCDFile("/tmp/pcd.pcd", pc);
 
-
-
-//
             ceres::Solver::Options options;
             options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
             options.minimizer_progress_to_stdout = true;
