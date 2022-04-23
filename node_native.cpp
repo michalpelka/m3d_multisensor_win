@@ -68,6 +68,8 @@ public:
 
         pt.put("status.board.msgs", (int)client1->getEncoder_msgs_count());
         pt.put("status.board.angle", client1->getEncoderLast().angle);
+        pt.put("status.board.rotated", client1->getRotatedRadians());
+
 
         pt.put("status.hw1.livox_1.rejection_rate", livox_client_1->getRejectionRate());
         pt.put("status.hw1.livox_1.data_rate", livox_client_1->getDataRate());
@@ -220,9 +222,9 @@ public:
 
 //
         const auto dataHandler2 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc) {
-            if (aggregation_deadline != std::chrono::time_point<std::chrono::system_clock>()) {
+            if (scan_active[1]) {
                 std::cout << "pc2.size()" << pc.size() << std::endl;
-                if (std::chrono::system_clock::now() < aggregation_deadline)
+                if (client1->getRotatedRadians() < 2.2*M_PI)
                 {
                     aggregated_pointclouds[1] += pc;
                 }
@@ -239,12 +241,15 @@ public:
                         std::cout << "============================================" << std::endl;
                         aggregated_pointclouds[1].clear();
                     }
+
+                    scan_active[1] = false;
+
                 }
             }
         };
         const auto dataHandler3 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc) {
-            if (aggregation_deadline != std::chrono::time_point<std::chrono::system_clock>()) {
-                if (std::chrono::system_clock::now() < aggregation_deadline)
+            if (scan_active[2]) {
+                if (client1->getRotatedRadians() < 2.2 * M_PI)
                 {
                     aggregated_pointclouds[2] += pc;
                 }
@@ -261,6 +266,7 @@ public:
                         std::cout << "============================================" << std::endl;
                         aggregated_pointclouds[2].clear();
                     }
+                    scan_active[2] = false;
                 }
             }
         };
@@ -320,42 +326,26 @@ public:
         std::thread http_thread2(file_server::server_worker);
 
         const auto aggregate_data =[&](const std::string& t){
+            client1->clearRotatedRadians();
+            scan_active[0] = true;
+            scan_active[1] = true;
+            scan_active[2] = true;
+
             using namespace std::chrono;
             auto tt = t;
             aggregation_deadline = system_clock::now()+std::chrono::seconds(std::atoi(tt.c_str()));
             
             int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
 
-          /*  std::thread ladybug_th{ [=]() {
-                captureLadybugImage(std::to_string(timestamp) + "_");
+            std::thread ladybug_th{ [=]() {
+                captureLadybugImage(file_server::repo + std::to_string(timestamp) + "_");
             } };
-            ladybug_th.detach();*/
+            ladybug_th.detach();
 
         };
         health_server::setTriggerHandler(aggregate_data, "scan");
 
 #ifdef WITH_LADYBUG
-
-        const auto aggregate_data_ladybug = [&](const std::string& t) {
-            using namespace std::chrono;
-            auto tt = t;
-            aggregation_deadline = system_clock::now() + std::chrono::seconds(std::atoi(tt.c_str()));
-
-            int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
-
-            try {
-                int result = captureLadybugImage(file_server::repo +std::to_string(timestamp) + "_photo_");
-                return std::to_string(result);
-            }
-            catch (std::exception& err) {
-                return std::string(err.what());
-            }
-            return std::string("failed");
-
-        };
-
-        health_server::setTriggerHandler(aggregate_data_ladybug, "scan_photo_block");
-
 
         const auto take_photo = [&](const std::string& t) {
             try {
@@ -409,8 +399,9 @@ private:
     std::shared_ptr<livox_client> livox_client_1;
     std::shared_ptr<livox_client> livox_client_2;
 
-
     std::vector<double> velodyne_data_rate;
+    double rotated_radians{ 0 };
+    bool scan_active[3] = { false,false,false };
     std::chrono::time_point<std::chrono::system_clock> aggregation_deadline;
     std::array<pcl::PointCloud<pcl::PointXYZINormal>,3> aggregated_pointclouds;
 };

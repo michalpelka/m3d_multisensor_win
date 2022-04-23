@@ -6,7 +6,7 @@
 #include <boost/bind.hpp>
 #include <thread>
 #include <mutex>
-#include <set>
+#include <set>nc
 #include "mavlink/3dunit/mavlink.h"
 
 using boost::asio::ip::udp;
@@ -56,6 +56,15 @@ public:
 		handler_pps_middle = _handler_pps_change;
 	}
 
+	double getRotatedRadians() {
+		std::lock_guard<std::mutex> lck(mutex_);
+		return rotated_radians; }
+
+	void clearRotatedRadians() {
+		std::lock_guard<std::mutex> lck(mutex_);
+		rotated_radians = 0; 
+	}
+
 private:
 	mutable std::mutex mutex_;
 	unsigned int encoder_msgs_count = 0;
@@ -64,10 +73,13 @@ private:
     unsigned int middle_handler_fired_at =0;
 	std::multiset<encoder_with_timestamp> buffer;
     boost::asio::deadline_timer timer_;
+	double rotated_radians = 0;
+	double last_encoder = 0;
+
 private:
 	std::function<void(double, double)> handler_pps_middle;
     void clearMessagesCnt();
-
+	
 
 };
 #endif /* MAVLINK_CLIENT_H */

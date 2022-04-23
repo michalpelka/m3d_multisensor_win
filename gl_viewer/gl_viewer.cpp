@@ -59,6 +59,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 int main(int argc, char** argv) {
     calibration_planes.resize(1);
+    std::string fn1 = argv[1];
+    std::string fn2 = argv[2];
+
     //extrinsic_calib_vec = { Sophus::Vector6f::Zero(),Sophus::Vector6f::Zero() };
     extrinsic_calib_vec = calib_struct::initializeCalib();
     GLFWwindow* window;
@@ -111,13 +114,13 @@ int main(int argc, char** argv) {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZINormal>);
-    pcl::io::loadPCDFile<pcl::PointXYZINormal>("D:/1649933930_pointcloud_raw_livox_1.pcd",*cloud2);
+    pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn1,*cloud2);
     int len2 = 0; 
     std::shared_ptr<float[]> data2 = calib_struct::pclToBuffer(cloud2, len2, 1.0f);
     std::shared_ptr<calib_struct::KeyFrame> k2 = std::make_shared<calib_struct::KeyFrame>(data2, len2, Eigen::Matrix4d::Identity(),2);
 
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZINormal>);
-    pcl::io::loadPCDFile<pcl::PointXYZINormal>("D:/1649933930_pointcloud_raw_livox_2.pcd", *cloud1);
+    pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn2, *cloud1);
     int len1 = 0;
     std::shared_ptr<float[]> data1 = calib_struct::pclToBuffer(cloud1, len1, 1.0f);
     std::shared_ptr<calib_struct::KeyFrame> k1 = std::make_shared<calib_struct::KeyFrame>(data1, len1, Eigen::Matrix4d::Identity(), 1);
@@ -161,7 +164,7 @@ int main(int argc, char** argv) {
                 shader.setUniformMat4f("u_MVP", proj * model_rotation_2 * mat);
                 renderer.Draw(va_co, ib_co, shader, GL_LINES);
 
-                shader.setUniformMat4f("u_MVP", proj * model_rotation_2 * mat * glm::scale(glm::mat4(1.0f), glm:: (p.size.x(), p.size.y(), 1.0f)));
+                shader.setUniformMat4f("u_MVP", proj * model_rotation_2 * mat * glm::scale(glm::mat4(1.0f), glm::vec3(p.size.x(), p.size.y(), 1.0f)));
                 renderer.Draw(va_plane, ib_plane, shader, GL_TRIANGLES);
             }
         }

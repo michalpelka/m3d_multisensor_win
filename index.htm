@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Status</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        var host_global = "http://127.0.0.1:8001"
+
+        var start = new Date;
+        function populate(){
+            //var host = window.location.protocol + "//" + window.location.host;
+           
+            $.ajax({
+                url: host_global+"/json/status"
+            }).then(function(data) {
+                var obj = jQuery.parseJSON(data);
+
+                $('.board_1_msgs').text( obj.status.board.msgs);
+                $('.board1_angle').text(obj.status.board.angle);
+                $('.board1_rotated').text(obj.status.board.rotated);
+                
+
+                $('.livox_1_data_rate').text( obj.status.hw1.livox_1.data_rate);
+                $('.livox_1_rej_rate').text(obj.status.hw1.livox_1.rejection_rate);
+
+                $('.livox_2_data_rate').text( obj.status.hw1.livox_2.data_rate);
+                $('.livox_2_rej_rate').text(obj.status.hw1.livox_2.rejection_rate);
+                
+
+            });
+        };
+        setInterval(function() {populate();}, 1000);
+
+        $(document).ready(function() {populate();});
+
+        function ladybug() {
+          var host = host_global;
+          $.ajax({
+                url: host+"/trig/ladybug"
+          })
+        }
+        function scan() {
+          var host = host_global;
+          $.ajax({
+                url: host+"/trig/scan?10"
+          })
+        }
+
+    //    function trg_button_reset(board) {
+    //       var host = host + "//" + window.location.host;
+    //       var data = document.getElementById('scan_name').value
+    //       console.log("calling "+host+"/trig/resetBoard?"+board);
+
+    //       $.ajax({
+    //             url: host+"/trig/resetBoard?"+board
+    //       })
+    //     }
+
+        
+       function trg_set_rpm() {
+          var slider_rpm = document.getElementById("rpmRange");
+          var host = host_global
+          console.log("calling "+host+"/trig/mvel?"+slider_rpm.value);
+          $.ajax({
+                url:host+"/trig/mvel?"+slider_rpm.value
+          })
+        }
+    </script>
+
+</head>
+
+<body>
+<button type="button" id="btn_trigg1" onclick="ladybug()" style="display:inline;" >Ladybug</button>
+<button type="button" id="btn_trigg2" onclick="scan()" style="display:inline;" >Scan</button>
+<div>
+    <h1> System Health <div class="system_emot" style="display:inline;"> &#129314;</div></h1>
+    
+
+    <h2>Board</h2>
+    <div><p style="margin:0;display:inline;float:left">Board msgs:</p> <p class="board_1_msgs"></p></div>
+    <div><p style="margin:0;display:inline;float:left">Angle :</p> <p class="board1_angle"></p></div>
+    <div><p style="margin:0;display:inline;float:left">Rotated :</p> <p class="board1_rotated"></p></div>
+    
+
+    <h2>Livox 1</h2>
+    <div><p style="margin:0;display:inline;float:left">Rate:</p> <p class="livox_1_data_rate"></p></div>
+    <div><p style="margin:0;display:inline;float:left">Rejection:</p> <p class="livox_1_rej_rate"></p></div>
+
+    <h2>Livox 2</h2>
+    <div><p style="margin:0;display:inline;float:left">Rate:</p> <p class="livox_2_data_rate"></p></div>
+    <div><p style="margin:0;display:inline;float:left">Rejection:</p> <p class="livox_2_rej_rate"></p></div>
+
+
+    <input style="display:inline;height: 25px;width: 500px;"  type="range" min="0" max="2000" value="500" id="rpmRange">
+    <p style="display:inline;"  >Value: <span id="rpmRangeValue"></span></p>
+    <button type="button" onclick="trg_set_rpm()" style="display:inline;" >SetRPM</button>
+  
+  <script>
+      document.getElementById("rpmRangeValue").innerHTML = document.getElementById("rpmRange").value;
+      document.getElementById("rpmRange").oninput = function() {
+          document.getElementById("rpmRangeValue").innerHTML  = this.value + "RPM";
+      }
+  </script>
+
+
+</body>
+</html>

@@ -121,6 +121,11 @@ void mavlink_client_udp::handle_receive_from(char* data, size_t bytes_recvd)
 					buffer.erase(buffer.begin());
 				}
 				encoder_msgs_count++;
+				const float delta_encoder1 = tt.encoder1 - last_encoder;
+				last_encoder = tt.encoder1;
+				if (std::abs(delta_encoder1) < 0.01) {
+					rotated_radians += delta_encoder1;
+				}
 			}
 
 			if (message.msgid == MAVLINK_MSG_ID_LD_CAMERA_STROBE)
