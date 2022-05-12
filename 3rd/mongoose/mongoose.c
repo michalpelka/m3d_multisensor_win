@@ -2487,7 +2487,7 @@ void mg_mgr_free(struct mg_mgr *mgr) {
 #if MG_ARCH == MG_ARCH_FREERTOS_TCP
   FreeRTOS_DeleteSocketSet(mgr->ss);
 #endif
-  LOG(LL_INFO, ("All connections closed"));
+  //LOG(LL_INFO, ("All connections closed"));
 }
 
 void mg_mgr_init(struct mg_mgr *mgr) {

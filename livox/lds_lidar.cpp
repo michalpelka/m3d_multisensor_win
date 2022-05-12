@@ -157,16 +157,17 @@ void LdsLidar::GetLidarDataCb(uint8_t handle, LivoxEthPacket *data,
     if (data->data_type == kCartesian || data->data_type == kExtendCartesian)
     {
         double global_timestamp_t = lidar_this->global_timestamp[handle];
-        if (ts_sec > 1.0)
-        {
-            std::cout << "[Strange PPS on livox " << int(handle) << "]\t" << ts_sec << std::endl;
-        }
+
         if (lidar_this->last_second_[handle] > 0.9 && ts_sec < 0.1)
         {
             global_timestamp_t = global_timestamp_t + 1;
             lidar_this->global_timestamp[handle].store(global_timestamp_t);
             std::cout << "PPS on tunrover on Livox " << int(handle) << std::endl;
             //std::cout <<  "PPS on livox " << int(handle) <<"\t" << lidar_this->last_second_[handle] << " " << ts_sec << std::endl;
+        }
+        else if (ts_sec > 1.0+1e-3)
+        {
+            std::cout << "[Strange PPS on livox " << int(handle) << "]\t" << ts_sec << std::endl;
         }
         lidar_this->last_second_[handle] = ts_sec;
 

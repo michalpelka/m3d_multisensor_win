@@ -1,6 +1,7 @@
 #include "mavlink_client_udp.h"
 #include "livox_client.h"
 #include "velodyne_client.h"
+#include "robot_client.h"
 
 #include <boost/thread.hpp>
 
@@ -70,13 +71,11 @@ public:
         pt.put("status.board.angle", client1->getEncoderLast().angle);
         pt.put("status.board.rotated", client1->getRotatedRadians());
 
-
         pt.put("status.hw1.livox_1.rejection_rate", livox_client_1->getRejectionRate());
         pt.put("status.hw1.livox_1.data_rate", livox_client_1->getDataRate());
 
         pt.put("status.hw1.livox_2.rejection_rate", livox_client_2->getRejectionRate());
         pt.put("status.hw1.livox_2.data_rate", livox_client_2->getDataRate());
-
 
         if (velo_client1) {
             pt.put("status.hw1.velodyne_1.data_rate", velo_client1->getDataRate());
@@ -122,6 +121,12 @@ public:
         {
             std::lock_guard<std::mutex> lck(tcp_client_status);
             pt.put("status.hw1.board.tt", tt_status_client_1);
+        }
+        {
+            std::stringstream oss(robot_client_0->getReport());
+            boost::property_tree::ptree pt_ros;
+            boost::property_tree::json_parser::read_json(oss, pt_ros);
+            pt.put_child("status.ros", pt_ros);
         }
         std::stringstream oss;
         boost::property_tree::write_json(oss, pt);
@@ -219,6 +224,7 @@ public:
         read_lidar.setClient(client1);
         livox_client_1 = std::make_shared<livox_client>(client1, "1PQDH7600102371");
         livox_client_2 = std::make_shared<livox_client>(client1, "1PQDH7600102351");
+        robot_client_0 = std::make_shared< robot_client>("http://192.168.0.11:9000/status");
 
 //
         const auto dataHandler2 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc) {
@@ -338,9 +344,16 @@ public:
             int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
 
             std::thread ladybug_th{ [=]() {
-                captureLadybugImage(file_server::repo + std::to_string(timestamp) + "_");
+                try {
+                    captureLadybugImage(file_server::repo + std::to_string(timestamp) + "_");
+                }
+                catch (std::exception& err) {
+                   std::cerr <<  std::string(err.what());
+                }
             } };
             ladybug_th.detach();
+
+            return "ok";
 
         };
         health_server::setTriggerHandler(aggregate_data, "scan");
@@ -363,20 +376,26 @@ public:
             if (t=="1"){
                 client1->sendCommand("RRR\n");
             }
+            return "ok";
         };
 
         const auto fun_rotate = [&](const std::string& t) {
             client1->sendCommand("mvel "+t+"\n");
+            return "ok";
             
         };
         const auto fun_stop = [&](const std::string& t) {
              client1->sendCommand("moff\n");
-            
+             return "ok";
         };
+        const auto fun_get_voltage = [&](const std::string& t) {
+            return client1->sendTCPMessage("sdoR 127 3110 0\n");
+        };
+
         health_server::setTriggerHandler(reset1,     "resetBoard");
         health_server::setTriggerHandler(fun_rotate, "mvel");
         health_server::setTriggerHandler(fun_stop,   "moff");
-
+        health_server::setTriggerHandler(fun_get_voltage, "voltage");
 
         for (;;) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -398,6 +417,9 @@ private:
     
     std::shared_ptr<livox_client> livox_client_1;
     std::shared_ptr<livox_client> livox_client_2;
+
+    std::shared_ptr<robot_client> robot_client_0;
+
 
     std::vector<double> velodyne_data_rate;
     double rotated_radians{ 0 };

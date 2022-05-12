@@ -71,7 +71,7 @@ private:
     unsigned int encoder_msgs_rate = 0;
 
     unsigned int middle_handler_fired_at =0;
-	std::multiset<encoder_with_timestamp> buffer;
+	std::set<encoder_with_timestamp> buffer;
     boost::asio::deadline_timer timer_;
 	double rotated_radians = 0;
 	double last_encoder = 0;

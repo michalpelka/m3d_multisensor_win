@@ -20,10 +20,15 @@ void health_server::fn(struct mg_connection *c, int ev, void *ev_data, void *fn_
             if (mg_http_match_uri(hm, std::string("/trig/"+trig).c_str()))
             {
                 std::string query (hm->query.ptr, hm->query.len);
+                std::string ret = "nok";
                 if (fun){
-                    fun(query);
+                    ret = fun(query);
+                    mg_http_reply(c, 200, "Access-Control-Allow-Origin: *\n", ret.c_str());
                 }
-                mg_http_reply(c, 200, "Access-Control-Allow-Origin: *\n", "ok");
+                else {
+                    mg_http_reply(c, 404, "Access-Control-Allow-Origin: *\n", ret.c_str());
+                }
+
             }
         }
         if (mg_http_match_uri(hm, "/json/status")) {
@@ -35,14 +40,15 @@ void health_server::fn(struct mg_connection *c, int ev, void *ev_data, void *fn_
             mg_http_reply(c, 200, "Access-Control-Allow-Origin: *\n", data.c_str());
         }
         else {
-            mg_http_reply(c, 200, "Access-Control-Allow-Origin: *\n", static_web_status_page);
+            mg_http_reply(c, 404, "Access-Control-Allow-Origin: *\n", "Not found");
         }
+
     }
     (void) fn_data;
 }
 
 
-void health_server::setTriggerHandler(std::function<void(const std::string&)> hndl, std::string trigger){
+void health_server::setTriggerHandler(std::function<std::string(const std::string&)> hndl, std::string trigger){
     trig_handlers[trigger] = hndl;
 }
 

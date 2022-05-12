@@ -89,6 +89,7 @@ include_directories(3rd/Livox-SDK/sdk_core/include)
 add_library(m3d_clients_unit STATIC clients/mavlink_client_udp.cpp)
 add_library(m3d_clients_livox STATIC clients/livox_client.cpp livox/lds_lidar.cpp)
 add_library(m3d_clients_VLP  STATIC clients/velodyne_client.cpp velodyne/PacketDecoder.cpp velodyne/PacketDriver.cpp)
+add_library(m3d_clients_robot  STATIC clients/robot_client.cpp )
 
 include_directories(3rd/mongoose)
 add_library(mongoose  STATIC 3rd/mongoose/mongoose.c)
@@ -120,7 +121,8 @@ target_link_libraries(node_native
 		m3d_clients_livox		
 		${LADYBUG_LIBS}
 		livox_sdk_static
-		mongoose)
+		mongoose
+		m3d_clients_robot)
 #m3d_clients_XDK
 
 MESSAGE(${PCL_LIBRARIES})

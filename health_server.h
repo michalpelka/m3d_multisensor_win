@@ -10,9 +10,9 @@
 struct mg_connection;
 namespace health_server {
     static std::function<std::string()> produce_status;
-    static std::map<std::string,std::function<void(const std::string&)>> trig_handlers;
+    static std::map<std::string,std::function<std::string(const std::string&)>> trig_handlers;
     void setStatusHandler(std::function<std::string()> hndl);
-    void setTriggerHandler(std::function<void(const std::string&)> hndl, std::string trigger);
+    void setTriggerHandler(std::function<std::string(const std::string&)> hndl, std::string trigger);
 
     static const char *s_listen_on = "http://0.0.0.0:8001";
     void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data);

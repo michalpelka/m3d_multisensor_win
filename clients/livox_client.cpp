@@ -58,10 +58,8 @@ void livox_client::livox_sync_thread_worker()
             encoder_with_timestamp encoder_reading;
             const double err = client->getEncoder(packet_ts, encoder_reading);
             points_all++;
-//            const auto tf_mirror = getSE3Mirror(encoder_reading.angle);
-//            Eigen::Matrix<double,4,1> mirror_plane = catopric_livox::getPlaneCoefFromSE3(tf_mirror.matrix());
 
-            if (err < 0.002){
+            if (err < 0.001){
                 pc.reserve(pc.size()+packet.datachunk.size());
                 for (auto point : packet.datachunk){
                     pcl::PointXYZINormal p;
@@ -70,14 +68,6 @@ void livox_client::livox_sync_thread_worker()
                     p.normal_x = encoder_reading.angle;
                     p.normal_y = packet_ts-1.60000000e+09;
                     pc.push_back(p);
-                    //Eigen::Vector3d p_or = point.getArray3fMap().cast<double>();
-
-//                    csv_data << point.x <<"," << point.y <<","<< point.z <<","<< encoder_reading.angle<<","<< point.intensity<<","<< encoder_reading.timestamp <<"\n";
-//                    Eigen::Vector3d p_t =catopric_livox::getMirroredRay(p_or_n, p_d, mirror_plane);
-//                    p_t = -p_t;
-//                    //csv_data << p_t.x() <<"," << p_t.y() <<","<< p_t.z() <<","<< encoder_reading.angle<<","<< point.intensity<<","<< encoder_reading.timestamp <<"\n";
-//                    point.getArray3fMap() = p_t.cast<float>();
-//                    pc.push_back(point);
                     rate++;
                 }
 

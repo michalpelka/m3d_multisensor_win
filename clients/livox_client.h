@@ -43,7 +43,6 @@ public:
         return rejection_rate;
     }
     float getDataRate() const {
-        std::cout << "getDataRate " << data_rate << std::endl;
         return data_rate;
     }
 

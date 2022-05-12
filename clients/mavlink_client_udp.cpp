@@ -39,8 +39,8 @@ std::string mavlink_client_udp::sendTCPMessage(const std::string& msg){
         char data[1024];
         socket.read_some(boost::asio::buffer(data, 1024));
         socket.write_some(boost::asio::buffer(msg.data(), msg.size()), error);
-        socket.read_some(boost::asio::buffer(data, 1024));
-        return data;
+        const size_t data_size = socket.read_some(boost::asio::buffer(data, 1024));
+        return std::string(data, data+data_size);
     }catch (const std::exception &e) {
         return e.what();
     }
@@ -117,7 +117,7 @@ void mavlink_client_udp::handle_receive_from(char* data, size_t bytes_recvd)
 					middle_handler_fired_at = whole_sec;
 				}
 				buffer.insert(buffer.end(),ts);
-				if (buffer.size() > 500){
+				if (buffer.size() > 5000){
 					buffer.erase(buffer.begin());
 				}
 				encoder_msgs_count++;
