@@ -39,6 +39,14 @@ void health_server::fn(struct mg_connection *c, int ev, void *ev_data, void *fn_
             }
             mg_http_reply(c, 200, "Access-Control-Allow-Origin: *\n", data.c_str());
         }
+        if (mg_http_match_uri(hm, "/index.htm")) {
+            // Serve REST response
+            struct mg_http_serve_opts opts { NULL,NULL,NULL,NULL,NULL };
+            opts.extra_headers = "Access-Control-Allow-Origin: *\n";
+            mg_http_serve_file(c, hm, "index.htm", &opts);
+        
+            //mg_http_reply(c, 200, "Access-Control-Allow-Origin: *\n", data.c_str());
+        }
         else {
             mg_http_reply(c, 404, "Access-Control-Allow-Origin: *\n", "Not found");
         }
