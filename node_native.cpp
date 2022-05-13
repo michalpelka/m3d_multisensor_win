@@ -5,7 +5,6 @@
 
 #include <boost/thread.hpp>
 
-
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
@@ -20,6 +19,7 @@
 #include <boost/property_tree/json_parser.hpp>
 
 #include "health_server.h"
+#include <boost/filesystem.hpp>
 #ifdef WITH_LADYBUG
 #include "ladybug/ladybug_capture.h"
 #endif
@@ -124,9 +124,12 @@ public:
         }
         {
             std::stringstream oss(robot_client_0->getReport());
-            boost::property_tree::ptree pt_ros;
-            boost::property_tree::json_parser::read_json(oss, pt_ros);
-            pt.put_child("status.ros", pt_ros);
+            if(!oss.str().empty())
+            {
+                boost::property_tree::ptree pt_ros;
+                boost::property_tree::json_parser::read_json(oss, pt_ros);
+                pt.put_child("status.ros", pt_ros);
+            }
         }
         std::stringstream oss;
         boost::property_tree::write_json(oss, pt);
@@ -150,6 +153,7 @@ public:
 
     native_sync()
     {
+        boost::filesystem::create_directory(file_server::repo);
         boost::asio::io_service io_service;
 
         client1 = std::make_shared<mavlink_client_udp>(io_service, "192.168.1.10", 14550);
@@ -193,30 +197,52 @@ public:
         };*/
         // setup 
 
-        //const auto dataHandler_velo1 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc){
-        //    if (aggregation_deadline != std::chrono::time_point<std::chrono::system_clock>()) {
-        //        if (std::chrono::system_clock::now() < aggregation_deadline)
-        //        {
-        //            aggregated_pointclouds[0] += pc;
-        //        }
-        //        else {
-        //            if (!aggregated_pointclouds[0].empty())
-        //            {
-        //                using namespace std::chrono;
-        //                int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
-        //                pcl::io::savePCDFileBinary(std::to_string(timestamp) + "_pointcloud_raw_velodyne.pcd", aggregated_pointclouds[0]);
-        //                aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
-        //                std::cout << "============================================" << std::endl;
-        //                std::cout << "Done aggregating" << std::endl;
-        //                std::cout << "============================================" << std::endl;
-        //                aggregated_pointclouds[0].clear();
-        //            }
-        //        }
-        //    }
-        //};
-        //velo_client1 = std::make_shared<velodyne_client>(client1, "0.0.0.0", 2370, "C:\\Users\\micha\\Desktop\\m3d_multisensor_win\\VLP-16.xml");
+        const auto dataHandler_velo1 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc){
+            if (scan_active[0]) {
+                if (client1->getRotatedRadians() < 2.2 * M_PI)
+                {
+                    aggregated_pointclouds[0] += pc;
+                }
+                else {
+                    if (!aggregated_pointclouds[0].empty())
+                    {
 
-        //velo_client1->setHandler(dataHandler_velo1);
+                        using namespace std::chrono;
+                        int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
+                        std::cout << "saving file " << file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_velodyne.pcd" << std::endl;
+                        pcl::io::savePCDFileBinary(file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_velodyne.pcd", aggregated_pointclouds[0]);
+                        std::cout << "============================================" << std::endl;
+                        std::cout << "Done aggregating " << aggregated_pointclouds[0].size() << std::endl;
+                        std::cout << "============================================" << std::endl;
+                        aggregated_pointclouds[0].clear();
+                    }
+                    scan_active[0] = false;
+                }
+            }
+
+            /*if (aggregation_deadline != std::chrono::time_point<std::chrono::system_clock>()) {
+                if (std::chrono::system_clock::now() < aggregation_deadline)
+                {
+                    aggregated_pointclouds[0] += pc;
+                }
+                else {
+                    if (!aggregated_pointclouds[0].empty())
+                    {
+                        using namespace std::chrono;
+                        int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
+                        pcl::io::savePCDFileBinary(std::to_string(timestamp) + "_pointcloud_raw_velodyne.pcd", aggregated_pointclouds[0]);
+                        aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
+                        std::cout << "============================================" << std::endl;
+                        std::cout << "Done aggregating" << std::endl;
+                        std::cout << "============================================" << std::endl;
+                        aggregated_pointclouds[0].clear();
+                    }
+                }
+            }*/
+        };
+        velo_client1 = std::make_shared<velodyne_client>(client1, "0.0.0.0", 2370, "VLP-16.xml");
+
+        velo_client1->setHandler(dataHandler_velo1);
 
         std::vector<std::string> broadcast_code_strs;
         LdsLidar& read_lidar = LdsLidar::GetInstance();
@@ -240,8 +266,8 @@ public:
 
                         using namespace std::chrono;
                         int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
+                        std::cout << "saving file " << file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_livox_1.pcd" << std::endl;
                         pcl::io::savePCDFileBinary(file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_livox_1.pcd", aggregated_pointclouds[1]);
-                        aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
                         std::cout << "============================================" << std::endl;
                         std::cout << "Done aggregating " << aggregated_pointclouds [1].size()<< std::endl;
                         std::cout << "============================================" << std::endl;
@@ -265,8 +291,8 @@ public:
 
                         using namespace std::chrono;
                         int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
+                        std::cout << "saving file " << file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_livox_2.pcd" << std::endl;
                         pcl::io::savePCDFileBinary(file_server::repo + std::to_string(timestamp) + "_pointcloud_raw_livox_2.pcd", aggregated_pointclouds[2]);
-                        aggregation_deadline = std::chrono::time_point<std::chrono::system_clock>();
                         std::cout << "============================================" << std::endl;
                         std::cout << "Done aggregating " << aggregated_pointclouds[2].size() << std::endl;
                         std::cout << "============================================" << std::endl;
@@ -353,6 +379,27 @@ public:
             } };
             ladybug_th.detach();
 
+            try {
+                std::stringstream oss(robot_client_0->getReport());
+
+
+                std::ofstream robot_state(file_server::repo + std::to_string(timestamp) + ".json");
+                robot_state << oss.str();
+                robot_state.close();
+
+                boost::property_tree::ptree pt_ros;
+                boost::property_tree::json_parser::read_json(oss, pt_ros);
+
+                std::ofstream robot_odom(file_server::repo + std::to_string(timestamp) + "_odom.txt");
+                auto op = pt_ros.get_optional<std::string>("status.odometry.matrix");
+                if (op) {
+                    robot_odom << *op;
+                }
+                robot_odom.close();
+            }
+            catch (const std::exception& e) {
+                return e.what();
+            }
             return "ok";
 
         };

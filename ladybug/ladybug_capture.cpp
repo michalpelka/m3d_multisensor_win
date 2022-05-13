@@ -182,7 +182,7 @@ bool captureLadybugImage(const std::string& directory)
 		printf("Updating textures...\n");
 		handleError(ladybugUpdateTextures(context, LADYBUG_NUM_CAMERAS, (const unsigned char**)arpBuffers, LADYBUG_BGRU16), "ladybugUpdateTextures");
 		char filename[_MAX_PATH] = { 0 };
-		for (const double radius : { 0.5, 1.0,2.0,5.0,10.0,50.0,100.0, 1000.0})
+		for (const double radius : { 5.0, 10.0, 100.0, 1000.0})
 		{
 			handleError(ladybugSet3dMapSphereSize(context, radius));
 			// Render panorama

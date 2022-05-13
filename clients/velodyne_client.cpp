@@ -1,6 +1,7 @@
 
 #include "velodyne_client.h"
 #include "mavlink_client_udp.h"
+#include <boost/filesystem.hpp>
 #include <iostream>
 
 velodyne_client::velodyne_client(std::shared_ptr<mavlink_client_udp> encoder_client, const std::string& ip,
@@ -8,6 +9,9 @@ velodyne_client::velodyne_client(std::shared_ptr<mavlink_client_udp> encoder_cli
 client(encoder_client), ip(ip), udp_port(udp), xml_calib(xml_calibration),
 data_rate(0),rejection_rate(0),jitter(0)
 {
+    if (!boost::filesystem::exists(xml_calibration)) {
+        throw ("No xml calibration for velodyne");
+    }
     listner_thread = std::thread(&velodyne_client::velodyne_listener_thread_worker, this);
     synchronization_thread = std::thread(&velodyne_client::velodyne_sync_thread_worker, this);
 }
