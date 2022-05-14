@@ -117,7 +117,7 @@ void mavlink_client_udp::handle_receive_from(char* data, size_t bytes_recvd)
 					middle_handler_fired_at = whole_sec;
 				}
 				buffer.insert(buffer.end(),ts);
-				if (buffer.size() > 5000){
+				if (buffer.size() > kBufferMaxSize){
 					buffer.erase(buffer.begin());
 				}
 				encoder_msgs_count++;

@@ -30,8 +30,12 @@
 
                 $('.livox_2_data_rate').text( obj.status.hw1.livox_2.data_rate);
                 $('.livox_2_rej_rate').text(obj.status.hw1.livox_2.rejection_rate);
-                
 
+                $('.velodyne_1_data_rate').text( obj.status.hw1.velodyne_1.data_rate);
+                $('.velodyne_1_rej_rate').text(obj.status.hw1.velodyne_1.rejection_rate);
+                $('.ros_data_rate').text(obj.status.ros.status.odometry.odometry_msgs_cnt);
+                $('.ros_voltage').text(obj.status.ros.status.volatage);
+                
             });
         };
         setInterval(function() {populate();}, 1000);
@@ -95,6 +99,13 @@
     <div><p style="margin:0;display:inline;float:left">Rate:</p> <p class="livox_2_data_rate"></p></div>
     <div><p style="margin:0;display:inline;float:left">Rejection:</p> <p class="livox_2_rej_rate"></p></div>
 
+    <h2>Velodyne</h2>
+    <div><p style="margin:0;display:inline;float:left">Rate:</p> <p class="velodyne_1_data_rate"></p></div>
+    <div><p style="margin:0;display:inline;float:left">Rejection:</p> <p class="velodyne_1_rej_rate"></p></div>
+
+    <h2>ROS</h2>
+    <div><p style="margin:0;display:inline;float:left">Ros msgs:</p> <p class="ros_data_rate"></p></div>
+    <div><p style="margin:0;display:inline;float:left">Voltage:</p> <p class="ros_voltage"></p></div>
 
     <input style="display:inline;height: 25px;width: 500px;"  type="range" min="0" max="2000" value="500" id="rpmRange">
     <p style="display:inline;"  >Value: <span id="rpmRangeValue"></span></p>

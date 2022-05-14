@@ -30,6 +30,7 @@ public:
         std::lock_guard<std::mutex> lck(mutex);
         is_done = true;
     }
+
     bool getDone(){
         std::lock_guard<std::mutex> lck(mutex);
         return is_done;
@@ -39,16 +40,20 @@ public:
     {
         data_handler = handler;
     }
+
     const float getRejectionRate() const {
         return rejection_rate;
     }
+
     float getDataRate() const {
         return data_rate;
     }
 
+    /// Returns livox serial number
     const std::string& getLivoxSn() {
         return livox_serial;
     }
+
 private:
     std::shared_ptr<mavlink_client_udp> client;
     const std::string livox_serial;
@@ -61,9 +66,6 @@ private:
     std::function<void(pcl::PointCloud<pcl::PointXYZINormal>&)> data_handler;
     std::atomic<float> rejection_rate;
     std::atomic<float> data_rate;
-
-
-
 };
 
 #endif //SRC_VELODYNE_CLIENT_H

@@ -9,6 +9,8 @@
 #include <set>nc
 #include "mavlink/3dunit/mavlink.h"
 
+constexpr size_t kBufferMaxSize = 15000;
+
 using boost::asio::ip::udp;
 struct encoder_with_timestamp{
 	double timestamp;
@@ -72,6 +74,7 @@ private:
 
     unsigned int middle_handler_fired_at =0;
 	std::set<encoder_with_timestamp> buffer;
+
     boost::asio::deadline_timer timer_;
 	double rotated_radians = 0;
 	double last_encoder = 0;

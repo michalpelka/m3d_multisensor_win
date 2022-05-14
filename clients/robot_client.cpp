@@ -7,20 +7,34 @@ std::string getReport();
 void robot_client::robot_client_listener_thread_worker() {
     using namespace std::chrono_literals;
     while (true) {
-        done = false;
+        {
+            std::lock_guard<std::mutex> lck(mtx);
+            transaction_started = std::chrono::system_clock::now();
+            done = false;
+        }
         const char* s_url = url.c_str();
         struct mg_mgr mgr;
         mg_mgr_init(&mgr);                        // Init manager
         mg_http_connect(&mgr, s_url, robot_client::client_fn, (void*)this);  // Create client connection
-        while(!done) mg_mgr_poll(&mgr, 1000);         // Event loop
+        while(!done) mg_mgr_poll(&mgr, 100);         // Event loop
         mg_mgr_free(&mgr);                        // Cleanup
-        std::this_thread::sleep_for(500ms);
+        std::this_thread::sleep_for(250ms);
     }
 }
 
 void robot_client::client_fn(struct mg_connection* c, int ev, void* ev_data, void* fn_data) {
+    using namespace std::chrono_literals;
 	robot_client* this_ptr = reinterpret_cast<robot_client*>(fn_data);
     const char* s_url = this_ptr->url.c_str();
+    const auto current = std::chrono::system_clock::now();
+    std::chrono::duration<double> diff = current - this_ptr->transaction_started;
+    // it is taking too long, just try again.
+    if (diff > 2.0s) {
+        std::lock_guard<std::mutex> lck(this_ptr->mtx);
+        this_ptr->done = true;
+        std::cerr << "Cannot reach robot" <<std::endl;
+        return;
+    }
     if (ev == MG_EV_CONNECT) {
         struct mg_str host = mg_url_host(s_url);
         // Send request
@@ -38,6 +52,7 @@ void robot_client::client_fn(struct mg_connection* c, int ev, void* ev_data, voi
         std::swap(this_ptr->data,body_str);
     }
     else if (ev == MG_EV_ERROR) {
+        std::lock_guard<std::mutex> lck(this_ptr->mtx);
         this_ptr->done = true;
     }
 }

@@ -4,6 +4,7 @@
 #include <string>
 #include <mutex>
 #include <atomic>
+#include <chrono>
 class robot_client {
 public:
 	robot_client(const std::string url);
@@ -20,4 +21,5 @@ private:
 	std::thread listner_thread;
 	mutable std::mutex mtx;
 	std::atomic<bool> done;
+	std::chrono::time_point<std::chrono::system_clock> transaction_started;
 };

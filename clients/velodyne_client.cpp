@@ -82,7 +82,7 @@ void velodyne_client::velodyne_sync_thread_worker()
             double error = client->getEncoder(ts, encoder);
             local_chunks[i].angle = encoder.angle;
 
-            if (error < 0.01){
+            if (error < 0.001){
                 for (int j =0; j < local_chunks[i].points.size(); j++)
                 {
                     pcl::PointXYZINormal pt;
@@ -116,7 +116,7 @@ void velodyne_client::velodyne_sync_thread_worker()
             const double end = client->getStartOfBufferSecs();
             //std::cout << "[sync ] encoder_buffer: "<< start << " - "<< end << std::endl;
             float rate =  message_count==0?-1:(100.0*message_count_error/message_count);
-            std::cout << "[velo "+std::to_string(udp_port)+" ] rejection rate :  "<< rate <<"%"<< std::endl;
+            //std::cout << "[velo "+std::to_string(udp_port)+" ] rejection rate :  "<< rate <<"%"<< std::endl;
             //std::cout << "[sync ] jitter:         "<< laser_last_timestamp<<"\t"<<client->getEncoderLast().timestamp<< std::endl;
             rejection_rate.store(rate);
             jitter.store(laser_last_timestamp - client->getEncoderLast().timestamp);
