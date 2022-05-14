@@ -66,7 +66,19 @@ public:
     std::string produceReport()
     {
         boost::property_tree::ptree pt;
-
+        {
+            std::lock_guard<std::mutex> lck(aggegation_mutex);
+            pt.put("status.aggregation.0", (int)aggregated_pointclouds[0].size());
+            pt.put("status.aggregation.1", (int)aggregated_pointclouds[1].size());
+            pt.put("status.aggregation.2", (int)aggregated_pointclouds[2].size());
+            //pt.put("status.aggregation.time", std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - aggregation_start).count());
+        }
+        {
+            std::lock_guard<std::mutex> lck(succefully_saved_files_mutex);
+            for (auto& p : succefully_saved_files) {
+                pt.put("status.saved_files." + p.first, p.second);
+            }
+        }
         pt.put("status.board.msgs", (int)client1->getEncoder_msgs_count());
         pt.put("status.board.angle", client1->getEncoderLast().angle);
         pt.put("status.board.rotated", client1->getRotatedRadians());
@@ -215,6 +227,7 @@ public:
                         std::cout << "Done aggregating " << aggregated_pointclouds[0].size() << std::endl;
                         std::cout << "============================================" << std::endl;
                         aggregated_pointclouds[0].clear();
+                        reportFileSaving("Velodyne");
                     }
                     scan_active[0] = false;
                 }
@@ -255,7 +268,7 @@ public:
 //
         const auto dataHandler2 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc) {
             if (scan_active[1]) {
-                std::cout << "pc2.size()" << pc.size() << std::endl;
+                //std::cout << "pc2.size()" << pc.size() << std::endl;
                 if (client1->getRotatedRadians() < 2.2*M_PI)
                 {
                     aggregated_pointclouds[1] += pc;
@@ -272,6 +285,7 @@ public:
                         std::cout << "Done aggregating " << aggregated_pointclouds [1].size()<< std::endl;
                         std::cout << "============================================" << std::endl;
                         aggregated_pointclouds[1].clear();
+                        reportFileSaving("Livox1");
                     }
 
                     scan_active[1] = false;
@@ -297,6 +311,7 @@ public:
                         std::cout << "Done aggregating " << aggregated_pointclouds[2].size() << std::endl;
                         std::cout << "============================================" << std::endl;
                         aggregated_pointclouds[2].clear();
+                        reportFileSaving("Livox2");
                     }
                     scan_active[2] = false;
                 }
@@ -358,20 +373,25 @@ public:
         std::thread http_thread2(file_server::server_worker);
 
         const auto aggregate_data =[&](const std::string& t){
-            client1->clearRotatedRadians();
-            scan_active[0] = true;
-            scan_active[1] = true;
-            scan_active[2] = true;
-
             using namespace std::chrono;
-            auto tt = t;
-            aggregation_deadline = system_clock::now()+std::chrono::seconds(std::atoi(tt.c_str()));
-            
-            int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
+            client1->clearRotatedRadians();
+            {
+                std::lock_guard<std::mutex> lck(aggegation_mutex);
+                scan_active[0] = true;
+                scan_active[1] = true;
+                scan_active[2] = true;
 
+
+                auto tt = t;
+                aggregation_deadline = system_clock::now() + std::chrono::seconds(std::atoi(tt.c_str()));
+                aggregation_start = system_clock::now();
+
+            }
+            int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
             std::thread ladybug_th{ [=]() {
                 try {
                     captureLadybugImage(file_server::repo + std::to_string(timestamp) + "_");
+                    reportFileSaving("Ladybug");
                 }
                 catch (std::exception& err) {
                    std::cerr <<  std::string(err.what());
@@ -396,6 +416,7 @@ public:
                     robot_odom << *op;
                 }
                 robot_odom.close();
+                reportFileSaving("Odometry");
             }
             catch (const std::exception& e) {
                 return e.what();
@@ -411,6 +432,7 @@ public:
             try {
                 int result = captureLadybugImage(file_server::repo + "photo_");
                 return std::to_string(result);
+                reportFileSaving("Ladybug");
             }
             catch (std::exception & err) {
                 return std::string(err.what());
@@ -471,8 +493,22 @@ private:
     std::vector<double> velodyne_data_rate;
     double rotated_radians{ 0 };
     bool scan_active[3] = { false,false,false };
+    std::mutex aggegation_mutex;
     std::chrono::time_point<std::chrono::system_clock> aggregation_deadline;
+    std::chrono::time_point<std::chrono::system_clock> aggregation_start;
     std::array<pcl::PointCloud<pcl::PointXYZINormal>,3> aggregated_pointclouds;
+    std::mutex succefully_saved_files_mutex;
+    std::map<std::string, int> succefully_saved_files{ {"Livox1",0},{"Livox2",0},{"Velodyne",0},{"Odometry",0},{"Ladybug",0}};
+    void reportFileSaving(const std::string& device) {
+        std::lock_guard<std::mutex>lck(succefully_saved_files_mutex);
+        auto it = succefully_saved_files.find(device);
+        if (it == succefully_saved_files.end()) {
+            succefully_saved_files["device"] = 1;
+        }
+        else {
+            it->second++;
+        }
+    }
 };
 
 int main(int argc, char** argv) {

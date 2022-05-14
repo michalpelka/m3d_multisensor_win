@@ -9,7 +9,7 @@
 #include <set>nc
 #include "mavlink/3dunit/mavlink.h"
 
-constexpr size_t kBufferMaxSize = 15000;
+constexpr size_t kBufferMaxSize = 500;
 
 using boost::asio::ip::udp;
 struct encoder_with_timestamp{

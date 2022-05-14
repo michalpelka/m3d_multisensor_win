@@ -208,7 +208,7 @@ void LdsLidar::GetLidarDataCb(uint8_t handle, LivoxEthPacket *data,
             }
             std::lock_guard<std::mutex> lck(lidar_this->m_buffer[handle].buffer_lock);
             lidar_this->m_buffer[handle].buffer.push_back(new_packet);
-            if (lidar_this->m_buffer[handle].buffer.size() > 1000) {
+            if (lidar_this->m_buffer[handle].buffer.size() > 100) {
                 //std::cout <<" 1: "<< std::to_string(lidar_this->m_buffer.buffer.front().timestamp) << "\t" << std::to_string(lidar_this->m_buffer.buffer.back().timestamp) << std::endl;
                 lidar_this->m_buffer[handle].buffer.pop_front();
             }

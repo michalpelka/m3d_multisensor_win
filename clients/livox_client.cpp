@@ -23,7 +23,7 @@ void livox_client::livox_sync_thread_worker()
             //std::cout << "[livox " << livox_serial << "] RATE " << rate  << std::endl;
             data_rate.store(rate);
             rate =0;
-            p1 = p2;
+            p1 = std::chrono::system_clock::now();
         }
         //find livox handle from SN, can be changed during operation
         int handle = -1;
@@ -40,7 +40,7 @@ void livox_client::livox_sync_thread_worker()
         {
             continue;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         auto data_to_work = read_lidar.getLivoxSynch(handle).popBack(10);
         if (points_all> 1e3){
@@ -76,7 +76,9 @@ void livox_client::livox_sync_thread_worker()
             }
 
         }
-        if (data_handler) {
+        if (pc.size() > 0 && data_handler) {
+
+            //std::cout << "[livox " << livox_serial << "] Data handler with pointcloud size  " << pc.size() << std::endl;
             data_handler(pc);
         }
     }
