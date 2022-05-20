@@ -13,3 +13,6 @@
 [submodule "3rd/ImGuizmo"]
 	path = 3rd/ImGuizmo
 	url = https://github.com/CedricGuillemet/ImGuizmo.git
+[submodule "3rd/Boost-Serial-Port"]
+	path = 3rd/Boost-Serial-Port
+	url = https://github.com/Tai-Min/Boost-Serial-Port.git

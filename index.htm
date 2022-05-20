@@ -39,6 +39,8 @@
                 $('.saved_livox1').text(obj.status.saved_files.Livox1);
                 $('.saved_livox2').text(obj.status.saved_files.Livox2);
                 $('.saved_odom').text(obj.status.saved_files.Odometry);
+                $('.saved_novatel').text(obj.status.saved_files.Novatel);
+                
                 if (obj.status.hasOwnProperty("ros"))
                 {
                     $('.ros_data_rate').text(obj.status.ros.status.odometry.odometry_msgs_cnt);
@@ -48,7 +50,12 @@
                     $('.ros_voltage').text("N/A");
                 }
 
-                
+                if (obj.status.hasOwnProperty("novatel"))
+                {
+                    $('.novatel_data_rate').text(obj.status.novatel.rate);
+                }else{
+                    $('.novatel_data_rate').text("N/A");
+                }
                                 
             });
         };
@@ -122,6 +129,7 @@
           <th>Livox1</th>
           <th>Livox2</th>
           <th>Odom</th>
+          <th>Novatel</th>
         </tr>
         <tr>
           <td class="saved_ladybug">-1</td>
@@ -129,6 +137,8 @@
           <td class="saved_livox1">-1</td>
           <td class="saved_livox2">-1</td>
           <td class="saved_odom">-1</td>
+          <td class="saved_novatel">-1</td>
+          
         </tr>
       </table>
       

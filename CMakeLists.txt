@@ -91,6 +91,9 @@ add_library(m3d_clients_livox STATIC clients/livox_client.cpp livox/lds_lidar.cp
 add_library(m3d_clients_VLP  STATIC clients/velodyne_client.cpp velodyne/PacketDecoder.cpp velodyne/PacketDriver.cpp)
 add_library(m3d_clients_robot  STATIC clients/robot_client.cpp )
 
+include_directories(3rd/Boost-Serial-Port/)
+add_library(m3d_clients_novatel  STATIC clients/novatel_client.cpp 3rd/Boost-Serial-Port/BoostSerial.cpp)
+
 include_directories(3rd/mongoose)
 add_library(mongoose  STATIC 3rd/mongoose/mongoose.c)
 
@@ -122,7 +125,8 @@ target_link_libraries(node_native
 		${LADYBUG_LIBS}
 		livox_sdk_static
 		mongoose
-		m3d_clients_robot)
+		m3d_clients_robot
+		m3d_clients_novatel)
 #m3d_clients_XDK
 
 MESSAGE(${PCL_LIBRARIES})

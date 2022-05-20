@@ -2,7 +2,9 @@
 #include "livox_client.h"
 #include "velodyne_client.h"
 #include "robot_client.h"
+#include "novatel_client.h"
 
+#include <cstdlib>
 #include <boost/thread.hpp>
 
 #include <pcl/point_cloud.h>
@@ -94,6 +96,11 @@ public:
             pt.put("status.hw1.velodyne_1.rejection_rate", velo_client1->getRejectionRate());
             pt.put("status.hw1.velodyne_1.jitter", velo_client1->getJitter());
         }
+        if (novatel_client_0) {
+            pt.put("status.novatel.msg", novatel_client_0->getReport());
+            pt.put("status.novatel.rate", novatel_client_0->getRate());
+        }
+
 
         const auto lidars_ptr = LdsLidar::GetInstance().getLidars();
         const uint32_t lidar_cnt = 32;
@@ -263,9 +270,14 @@ public:
         read_lidar.setClient(client1);
         livox_client_1 = std::make_shared<livox_client>(client1, "1PQDH7600102371");
         livox_client_2 = std::make_shared<livox_client>(client1, "1PQDH7600102351");
-        robot_client_0 = std::make_shared< robot_client>("http://192.168.0.11:9000/status");
-
-//
+        robot_client_0 = std::make_shared<robot_client>("http://192.168.0.11:9000/status");
+        const char* novatel_com_ptr =  std::getenv("novatel_com");
+        if (novatel_com_ptr)
+        {
+            const std::string novatel_port(novatel_com_ptr);
+            std::cout << "Openign port for novatel " << novatel_port << std::endl;
+            novatel_client_0 = std::make_shared<novatel_client>(novatel_port, 9600);
+        }
         const auto dataHandler2 = [&](pcl::PointCloud<pcl::PointXYZINormal>& pc) {
             if (scan_active[1]) {
                 //std::cout << "pc2.size()" << pc.size() << std::endl;
@@ -399,7 +411,26 @@ public:
             } };
             ladybug_th.detach();
 
+
             try {
+                if (novatel_client_0) {
+                    novatel_client_0->startLogToFile(file_server::repo + std::to_string(timestamp) + ".novatel");
+                    std::thread novatel_stop{ [=]() {
+                       const auto start = system_clock::now();
+                       
+                       while ((system_clock::now() - start) < 35s) {
+                           std::this_thread::sleep_for(0.5s);
+                           if (client1->getRotatedRadians() > 2.2 * M_PI) {
+                               break;
+                           }
+                       }
+                       if (novatel_client_0->stopLogToFile())
+                       {
+                           reportFileSaving("Novatel");
+                       }
+                    } };
+                    novatel_stop.detach();
+                }
                 std::stringstream oss(robot_client_0->getReport());
 
 
@@ -431,8 +462,9 @@ public:
         const auto take_photo = [&](const std::string& t) {
             try {
                 int result = captureLadybugImage(file_server::repo + "photo_");
-                return std::to_string(result);
                 reportFileSaving("Ladybug");
+                return std::to_string(result);
+
             }
             catch (std::exception & err) {
                 return std::string(err.what());
@@ -488,6 +520,8 @@ private:
     std::shared_ptr<livox_client> livox_client_2;
 
     std::shared_ptr<robot_client> robot_client_0;
+    std::shared_ptr<novatel_client> novatel_client_0;
+
 
 
     std::vector<double> velodyne_data_rate;
@@ -498,7 +532,7 @@ private:
     std::chrono::time_point<std::chrono::system_clock> aggregation_start;
     std::array<pcl::PointCloud<pcl::PointXYZINormal>,3> aggregated_pointclouds;
     std::mutex succefully_saved_files_mutex;
-    std::map<std::string, int> succefully_saved_files{ {"Livox1",0},{"Livox2",0},{"Velodyne",0},{"Odometry",0},{"Ladybug",0}};
+    std::map<std::string, int> succefully_saved_files{ {"Livox1",0},{"Livox2",0},{"Velodyne",0},{"Odometry",0},{"Ladybug",0},{"Novatel",0}};
     void reportFileSaving(const std::string& device) {
         std::lock_guard<std::mutex>lck(succefully_saved_files_mutex);
         auto it = succefully_saved_files.find(device);
