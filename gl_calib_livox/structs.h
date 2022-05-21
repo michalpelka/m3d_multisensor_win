@@ -32,7 +32,7 @@ namespace calib_struct{
 
     std::vector<Sophus::Vector6f> initializeCalib(const std::string& fn);
     
-    pcl::PointCloud<pcl::PointXYZINormal> createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib);
+    pcl::PointCloud<pcl::PointXYZINormal> createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib, float offset);
 
     struct plane {
         Eigen::Matrix4f matrix{ Eigen::Matrix4f::Identity() };
@@ -82,6 +82,8 @@ namespace calib_struct{
         }
 
     };
+
+    Eigen::Matrix4f loadSE3Matrix(const std::string & fn);
 
     void savePlanes(std::vector<plane>& planes, const std::string& fn);
     std::vector<plane> loadPlanes(const std::string& fn);

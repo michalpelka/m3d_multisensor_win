@@ -63,8 +63,8 @@ uniform float u_AngOffset;
 
 void main()
 {
-  float s = sin(angle);
-  float c = cos(angle);
+  float s = sin(angle+u_AngOffset);
+  float c = cos(angle+u_AngOffset);
   mat4 rot_angle = mat4(c, -s, 0, 0,
                 s,  c, 0, 0,
                 0,  0, 1, 0,
@@ -106,8 +106,8 @@ uniform float u_AngOffset;
 uniform mat4 u_LADYBUG;
 void main()
 {
-  float s = sin(angle);
-  float c = cos(angle);
+  float s = sin(angle+u_AngOffset);
+  float c = cos(angle+u_AngOffset);
   mat4 rot_angle = mat4(c, -s, 0, 0,
                 s,  c, 0, 0,
                 0,  0, 1, 0,

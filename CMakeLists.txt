@@ -89,7 +89,7 @@ endif()
 find_package(PCL REQUIRED COMPONENTS common io )
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
-find_package(Boost COMPONENTS system filesystem thread  REQUIRED)
+find_package(Boost COMPONENTS system filesystem thread program_options  REQUIRED)
 #find_package(Boost REQUIRED COMPONENTS system thread chrono)
 
 include_directories(
@@ -146,9 +146,11 @@ target_link_libraries(node_native
 MESSAGE(${PCL_LIBRARIES})
 MESSAGE(INFO ${PCL_COMMON_LIBRARY})
 IF (${BUILD_GL_VIEVER} STREQUAL "ON")
-	add_executable (gl_viever gl_viewer/gl_viewer.cpp gl_viewer/structs.cpp)
+	find_package(OpenCV COMPONENTS core highgui calib3d REQUIRED)
+
+	add_executable (gl_calib_livox gl_calib_livox/gl_calib_livox.cpp gl_calib_livox/structs.cpp)
 	#add_dependencies(node_native ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-	target_link_libraries(gl_viever
+	target_link_libraries(gl_calib_livox
 			${PCL_COMMON_LIBRARY}
 			${PCL_IO_LIBRARY}
 			${PCL_OCTREE_LIBRARY}
@@ -160,6 +162,19 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			GL_Codes 
 			${CMAKE_DL_LIBS}
 			${CERES_LIBRARIES}
-			)
+	)
+
+	add_executable(gl_calib_velodyne gl_calib_velodyne/gl_calib_velodyne.cpp gl_calib_velodyne/utils.cpp )
+	target_link_libraries(gl_calib_velodyne
+			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
+
+	add_executable(gl_calib_spherical gl_calib_velodyne/shperical_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp)
+	target_link_libraries(gl_calib_spherical
+			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
+
+	add_executable(gl_calib_perspective gl_calib_velodyne/perspective_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp)
+	target_link_libraries(gl_calib_perspective
+			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
+
 	# target_compile_features(gl_viever PUBLIC cxx_std_14)
 endif()

@@ -51,8 +51,14 @@ std::vector<Sophus::Vector6f> calib_struct::initializeCalib() {
     Eigen::Matrix4f calibration3 = Eigen::Matrix4f::Identity();
     calibration3.block<3, 3>(0, 0) = Eigen::AngleAxisf((-0.0 * M_PI / 180.0), Eigen::Vector3f::UnitZ()).toRotationMatrix();
 
+    // velodyne
+    Eigen::Matrix4f calibration4 = Eigen::Matrix4f::Identity();
+    calibration4 << 0,  0, 1, 0,
+            0,  1, 0, 0,
+            -1, 0, 0, 0,
+            0, 0, 0, 1;
 
-    return { Sophus::SE3f::fitToSE3(calibration2).log(),Sophus::SE3f::fitToSE3(calibration1).log(),Sophus::SE3f::fitToSE3(calibration3).log() };
+    return { Sophus::SE3f::fitToSE3(calibration2).log(),Sophus::SE3f::fitToSE3(calibration1).log(),Sophus::SE3f::fitToSE3(calibration4).log(),Sophus::SE3f::fitToSE3(calibration3).log()};
 }
 
 std::vector<Sophus::Vector6f> calib_struct::initializeCalib(const std::string& fn) {
@@ -73,7 +79,7 @@ std::vector<Sophus::Vector6f> calib_struct::initializeCalib(const std::string& f
     return r;
 }
 
-pcl::PointCloud<pcl::PointXYZINormal> calib_struct::createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib)
+pcl::PointCloud<pcl::PointXYZINormal> calib_struct::createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib, float offset)
 {
     pcl::PointCloud<pcl::PointXYZINormal> pc;
     const Eigen::Matrix4f calib_mat{ Sophus::SE3f::exp(calib).matrix() };
@@ -82,8 +88,8 @@ pcl::PointCloud<pcl::PointXYZINormal> calib_struct::createTransformedPc(const pc
     {
         const auto raw_point = (*raw)[i];
         const float angle = raw_point.normal_x;
-        const float s = sin(angle);
-        const float c = cos(angle);
+        const float s = sin(angle+offset);
+        const float c = cos(angle+offset);
         Eigen::Matrix4f rot_angle;
         rot_angle << c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1;
         const Eigen::Vector4f p{ raw_point.getArray4fMap() };
@@ -168,3 +174,11 @@ Eigen::Matrix3f calib_struct::findCovariance(std::vector<Eigen::Vector4f> points
     return covariance;
 }
 
+Eigen::Matrix4f calib_struct::loadSE3Matrix(const std::string & fn){
+    std::ifstream fs (fn);
+    Eigen::Matrix4f mat;
+    for (int i =0; i < 16; i++) {
+        fs >> mat.data()[i];
+    }
+    return Sophus::SE3f::fitToSE3(mat.transpose()).matrix();
+}
