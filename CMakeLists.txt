@@ -166,7 +166,12 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			${LADYBUG_LIBS}
 			${GLEW_LIBRARIES}
 			${GLFW_LIBRARIES}
-			GL_Codes opengl32 )
+			GL_Codes )
+	IF (WIN32)
+		target_link_libraries(gl_viever opengl32)
+	else()
+		target_link_libraries(gl_viever ${OPENGL_LIBRARIES} ${CMAKE_DL_LIBS})
+	endif()
 endif()
 
 IF (${BUILD_GL_CALIB} STREQUAL "ON")	
@@ -183,7 +188,7 @@ IF (${BUILD_GL_CALIB} STREQUAL "ON")
 			${GLEW_LIBRARIES} 
 			${GLFW_LIBRARIES}
 			${OPENGL_LIBRARIES}
-			GL_Codes 
+			GL_Codes
 			${CMAKE_DL_LIBS}
 			${CERES_LIBRARIES})
 	
