@@ -9,6 +9,7 @@ public:
 	void Bind() const;
 	void Unbind() const;
 	inline unsigned int GetCount() const { return m_Count; }
+    void update(const unsigned int * data, unsigned int count);
 private:
 	unsigned int m_RenderID;
 	unsigned int m_Count;

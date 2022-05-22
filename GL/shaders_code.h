@@ -7,3 +7,6 @@ extern const char* shader_pc_intensity_v;
 
 extern const char* shader_pc_intensity_head_v;
 extern const char* shader_pc_intensity_f;
+
+extern const char* shader_pc_spherical_head_v;
+extern const char* shader_pc_spherical_f;

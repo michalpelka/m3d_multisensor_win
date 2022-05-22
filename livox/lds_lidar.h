@@ -115,7 +115,7 @@ class LdsLidar {
   }
  private:
   std::shared_ptr<mavlink_client_udp> client{nullptr};
-  std::atomic<int> global_timestamp[kMaxLidarCount]{ -1 };
+  std::atomic<int> global_timestamp[kMaxLidarCount];
 
 
   LdsLidar();

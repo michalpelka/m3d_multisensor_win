@@ -7,6 +7,8 @@ project(m3d_multisensor)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 option(BUILD_GL_VIEVER "Build GL viever " ON )
+option(BUILD_GL_CALIB "Build GL calib " OFF )
+
 
 set(LADYBUG_SDK "NOT_SET" CACHE PATH "SDK ROOT DIR" )
 set (LADYBUG_LIBS "")
@@ -20,6 +22,10 @@ else()
 	SET(LADYBUG_LIBS ${LADYBUG_SDK}/lib64/ladybug.lib ladybug_capture)
 endif()
 
+find_package (Eigen3 REQUIRED)
+INCLUDE_DIRECTORIES ( "${EIGEN3_INCLUDE_DIR}" )
+message("EIGEN3_INCLUDE_DIR" ${EIGEN3_INCLUDE_DIR})
+
 IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 	find_package(OpenGL REQUIRED)	
 	message("Building BUILD_GL_VIEVER")
@@ -30,8 +36,19 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 		SET(GLEW_LIBRARIES ${CMAKE_SOURCE_DIR}/3rd_precompiled_win64/glew-2.1.0/lib/Release/x64/glew32.lib) # static GLEW library
 		SET(GLFW_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/3rd_precompiled_win64/glfw-3.3.6.bin.WIN64/include)
 		SET(GLFW_LIBRARIES ${CMAKE_SOURCE_DIR}/3rd_precompiled_win64/glfw-3.3.6.bin.WIN64/lib-vc2019/glfw3.lib) # static GLFW library
+		SET(OPENGL_LIBRARIES opengl32)
 	else()
-		message(FATAL "Win32 is only supported")
+
+		find_package(OpenGL REQUIRED)
+		find_package(glfw3 REQUIRED)
+		find_package(glm REQUIRED)
+		find_package(GLEW REQUIRED)
+		SET(GLFW_LIBRARIES glfw)
+		
+		if (GLEW_FOUND)
+			include_directories(${GLEW_INCLUDE_DIRS})
+			link_libraries(${GLEW_LIBRARIES})
+		endif()
 	endif()
 
 	# glm is header only
@@ -62,16 +79,19 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			3rd/imgui/backends/imgui_impl_opengl3.cpp 3rd/imgui/backends/imgui_impl_glfw.cpp
 			#ImViewGizmo
 			3rd/ImGuizmo/ImGuizmo.cpp
+			3rd/stb_image.h
 			)
 
-
+	IF (${BUILD_GL_CALIB} STREQUAL "ON")	
+		find_package(Ceres REQUIRED)
+	endif()
 endif()
 
 ## System dependencies are found with CMake's conventions
 find_package(PCL REQUIRED COMPONENTS common io )
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
-find_package(Boost COMPONENTS system filesystem thread  REQUIRED)
+find_package(Boost COMPONENTS system filesystem thread program_options  REQUIRED)
 #find_package(Boost REQUIRED COMPONENTS system thread chrono)
 
 include_directories(
@@ -95,7 +115,7 @@ include_directories(3rd/Boost-Serial-Port/)
 add_library(m3d_clients_novatel  STATIC clients/novatel_client.cpp 3rd/Boost-Serial-Port/BoostSerial.cpp)
 
 include_directories(3rd/mongoose)
-add_library(mongoose  STATIC 3rd/mongoose/mongoose.c)
+add_library(mongoose STATIC 3rd/mongoose/mongoose.c)
 
 #xsens
 #include_directories(3rd/xsens/xspublic/ 3rd/xsens/xspublic/xscommon/ 3rd/xsens/xspublic/xscontroller/ xsens/xspublic/xstypes/)
@@ -127,12 +147,16 @@ target_link_libraries(node_native
 		mongoose
 		m3d_clients_robot
 		m3d_clients_novatel)
+
+# target_compile_features(node_native PUBLIC cxx_std_14)
+
 #m3d_clients_XDK
 
 MESSAGE(${PCL_LIBRARIES})
 MESSAGE(INFO ${PCL_COMMON_LIBRARY})
-IF (${BUILD_GL_VIEVER} STREQUAL "ON")
-	add_executable (gl_viever gl_viewer/gl_viewer.cpp gl_viewer/structs.cpp)
+
+IF (${BUILD_GL_VIEVER} STREQUAL "ON")	
+	add_executable (gl_viever gl_viewer/gl_viewer.cpp gl_calib_livox/structs.cpp)
 	#add_dependencies(node_native ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 	target_link_libraries(gl_viever
 			${PCL_COMMON_LIBRARY}
@@ -142,8 +166,41 @@ IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 			${LADYBUG_LIBS}
 			${GLEW_LIBRARIES}
 			${GLFW_LIBRARIES}
-			GL_Codes opengl32 
-			)
+			GL_Codes opengl32 )
+endif()
+
+IF (${BUILD_GL_CALIB} STREQUAL "ON")	
+	find_package(OpenCV COMPONENTS core highgui calib3d REQUIRED)
+
+	add_executable (gl_calib_livox gl_calib_livox/gl_calib_livox.cpp gl_calib_livox/structs.cpp)
+	#add_dependencies(node_native ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+	target_link_libraries(gl_calib_livox
+			${PCL_COMMON_LIBRARY}
+			${PCL_IO_LIBRARY}
+			${PCL_OCTREE_LIBRARY}
+			${Boost_LIBRARIES}	
+			${LADYBUG_LIBS}
+			${GLEW_LIBRARIES} 
+			${GLFW_LIBRARIES}
+			${OPENGL_LIBRARIES}
+			GL_Codes 
+			${CMAKE_DL_LIBS}
+			${CERES_LIBRARIES})
+	
+	add_executable(gl_calib_velodyne gl_calib_velodyne/gl_calib_velodyne.cpp gl_calib_velodyne/utils.cpp )
+	target_link_libraries(gl_calib_velodyne
+			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
+
+	add_executable(gl_calib_spherical gl_calib_velodyne/shperical_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp)
+	target_link_libraries(gl_calib_spherical
+			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
+
+	add_executable(gl_calib_perspective gl_calib_velodyne/perspective_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp)
+	target_link_libraries(gl_calib_perspective
+			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
+
+	# target_compile_features(gl_viever PUBLIC cxx_std_14)
+
 endif()
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/index.htm
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

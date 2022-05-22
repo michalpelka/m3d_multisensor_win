@@ -12,7 +12,7 @@
 #include "imgui/backends/imgui_impl_glfw.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "ImGuizmo/ImGuizmo.h"
-#include "structs.h"
+#include "gl_calib_livox/structs.h"
 
 std::vector<Sophus::Vector6f> extrinsic_calib_vec;
 std::vector<calib_struct::plane> calibration_planes;
@@ -211,8 +211,8 @@ int main(int argc, char** argv) {
             calib_struct::saveConfig(extrinsic_calib_vec, "calib.txt");
         }
         if (ImGui::Button("ExportPDC")) {
-            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
+            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1],0);
+            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0],0);
             pcl::io::savePCDFileBinary("test1_pcd.pcd", pcd1);
             pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd2);
         }
@@ -225,8 +225,8 @@ int main(int argc, char** argv) {
             calib_struct::savePlanes(calibration_planes, "planes.txt");
         }
         if (ImGui::Button("ExportPDC")) {
-            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
+            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1],0);
+            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0],0);
             pcl::io::savePCDFileBinary("test1_pcd.pcd", pcd1);
             pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd2);
         }
@@ -251,9 +251,9 @@ int main(int argc, char** argv) {
             snprintf(b, 256, "export plane %d", i);
             if (ImGui::Button(b)) {
 
-                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
-                std::vector <pcl::PointCloud<pcl::PointXYZI>> pcds{ pcd1,pcd2 };
+                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1],0);
+                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0],0);
+                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ pcd1,pcd2 };
 
                 pcl::PointCloud<pcl::PointXYZL> cloud;
                 
@@ -286,9 +286,9 @@ int main(int argc, char** argv) {
             if (ImGui::Button(b)) {
 
 
-                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1]);
-                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0]);
-                std::vector <pcl::PointCloud<pcl::PointXYZI>> pcds{ pcd1,pcd2 };
+                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[1],0);
+                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[0],0);
+                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ pcd1,pcd2 };
 
                 std::vector<Eigen::Vector4f> cloud;
 
