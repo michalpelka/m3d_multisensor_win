@@ -5,7 +5,7 @@
 #include <mutex>
 #include <atomic>
 #include <chrono>
-#include <Boost-Serial-Port/BoostSerial.h>
+#include <BoostSerial.h>
 class novatel_client {
 public:
 	novatel_client(const std::string portname, int baudrate);
