@@ -17,10 +17,12 @@ bool novatel_client::startLogToFile(std::string filename) {
 }
 bool novatel_client::stopLogToFile() {
     std::lock_guard<std::mutex> lck(mtx);
-    size_t size = log_fs->tellp();
-    log_fs->close();
-    log_fs = nullptr;
-    if (size > 50) return true;
+    if (log_fs) {
+        size_t size = log_fs->tellp();
+        log_fs->close();
+        log_fs = nullptr;
+        if (size > 50) return true;
+    }
     return false;
 }
 
