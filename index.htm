@@ -145,12 +145,49 @@
       background-color: #1b1d1c;
       margin: 1em 0;
     } 
+    .block {
+      display: block;
+      width: 100%;
+      background-color: #04AA6D;
+      padding: 14px 28px;
+      font-size: 16px;
+      margin: 0.2em 0;
+      cursor: pointer;
+      text-align: center;
+    }
+    .block:hover {
+      background-color: #ddd;
+      color: black;
+    }
+    .block:active {
+      background-color: #da2121;
+      color: black;
+    }
+
+    .nonblock {
+      display: block;
+      background-color: #04AA6D;
+      padding: 14px 28px;
+      font-size: 16px;
+      margin: 0.2em 0;
+      cursor: pointer;
+      text-align: center;
+    }
+    .nonblock:hover {
+      background-color: #ddd;
+      color: black;
+    }
+    .nonblock:active {
+      background-color: #da2121;
+      color: black;
+    }
+
     </style>
 </head>
 
 <body>
-<button type="button" id="btn_trigg1" onclick="ladybug()" style="display:inline;" >Ladybug</button>
-<button type="button" id="btn_trigg2" onclick="scan()" style="display:inline;" >Scan</button>
+<button type="button" id="btn_trigg1" onclick="ladybug()" style="display:inline;" class="block">Ladybug</button>
+<button type="button" id="btn_trigg2" onclick="scan()" style="display:inline;"class="block" >Scan</button>
 <div>
     <h1> System Health <div class="system_emot" style="display:inline;"> &#129314;</div></h1>
     
@@ -199,16 +236,16 @@
     <div><p style="margin:0;display:inline;float:left">Novatel msgs:</p> <p class="novatel_data_rate"></p></div>
     <div><pre id="novatel_data" ></pre></div>
     <div>
-      <button type="button" onclick="trg_set_rpm_off()" style="display:inline;" >OFF</button>
-      <button type="button" onclick="trg_set_rpm_value(100)" style="display:inline;" >100RPM</button>
-      <button type="button" onclick="trg_set_rpm_value(250)" style="display:inline;" >250RPM</button>
-      <button type="button" onclick="trg_set_rpm_value(500)" style="display:inline;" >500RPM</button>
-      <button type="button" onclick="trg_set_rpm_value(1000)" style="display:inline;" >1000RPM</button>
-      <button type="button" onclick="trg_set_rpm_value(2000)" style="display:inline;" >2000RPM</button>
+      <button type="button" onclick="trg_set_rpm_off()" style="display:inline;" class="nonblock">OFF</button>
+      <button type="button" onclick="trg_set_rpm_value(100)" style="display:inline;" class="nonblock" >100RPM</button>
+      <button type="button" onclick="trg_set_rpm_value(250)" style="display:inline;" class="nonblock" >250RPM</button>
+      <button type="button" onclick="trg_set_rpm_value(500)" style="display:inline;" class="nonblock" >500RPM</button>
+      <button type="button" onclick="trg_set_rpm_value(1000)" style="display:inline;" class="nonblock" >1000RPM</button>
+      <button type="button" onclick="trg_set_rpm_value(2000)" style="display:inline;" class="nonblock" >2000RPM</button>
     </div>
     <input style="display:inline;height: 25px;width: 500px;"  type="range" min="0" max="2000" value="500" id="rpmRange">
     <p style="display:inline;"  >Value: <span id="rpmRangeValue"></span></p>
-    <button type="button" onclick="trg_set_rpm()" style="display:inline;" >SetRPM</button>
+    <button type="button" onclick="trg_set_rpm()" style="display:inline;" class="nonblock">SetRPM</button>
   
   <script>
       document.getElementById("rpmRangeValue").innerHTML = document.getElementById("rpmRange").value;
