@@ -30,7 +30,7 @@ namespace m3d_utils {
     class ladybug_camera_calibration{
     public:
         void loadConfig(const std::string &fn);
-
+        void loadCfgFromString(const std::string &data);
         const std::vector<Eigen::Matrix4f> &getCameraExtrinsic() const;
         const std::vector<float> &getCameraFocal() const;
         const std::vector<Eigen::Vector2f> &getCameraCenter() const;

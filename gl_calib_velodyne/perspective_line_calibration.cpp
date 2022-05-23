@@ -6,9 +6,14 @@
 
 
 // optimizing and multihtrading
+#include "imgui/imgui.h"
+#include "imgui/backends/imgui_impl_glfw.h"
+#include "imgui/backends/imgui_impl_opengl3.h"
 #include "tbb/tbb.h"
 #include <mutex>
-
+#include <boost/program_options.hpp>
+#include <gl_calib_livox/structs.h>
+#include <static/ladybug_calib.hpp>
 // opengl
 #include "GL/glwrapper.h"
 #include "ImGuizmo/ImGuizmo.h"
@@ -16,6 +21,9 @@
 
 #include "cost_fun.h"
 #include "line_detector.h"
+
+std::vector<Sophus::Vector6f> extrinsic_calib_vec;
+const std::vector<float> encoder_offset{0,0,M_PI};
 m3d_utils::ladybug_camera_calibration ladybug_calibration;
 template<typename T> Sophus::SE3<T>  getSEFromParams(const T* const params)
 {
@@ -298,21 +306,38 @@ struct line_in_image{
     bool use {true};
 
 };
-Eigen::Matrix4f getIntialCalib()
-{
-    Sophus::Vector6f initial_se3;
-    initial_se3.setZero();
-    initial_se3[5] = -1.9f;
-    auto const k = Sophus::SE3f::exp(initial_se3);
-    return k.matrix();
-}
+
 int main(int argc, char **argv) {
 
-    std::string workspace(argv[1]);
-    std::cout << "workspace " << workspace << std::endl;
-    std::vector<std::string> extra_data{
-            workspace
-    };
+    namespace po = boost::program_options;
+    po::options_description description("MyTool Usage");
+
+    description.add_options()
+            ("help,h", "Display this help message")
+            ("input_data,i", po::value<std::string>(),"points to input data")
+            ("calibration_file,c",po::value<std::string>()->default_value("calibs.txt"), "calibration file")
+            ("workspace,w",po::value<std::string>()->default_value(""), "workspace where primitives are kept");
+    std::cout << description << "\n";
+    po::variables_map vm;
+    po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
+    po::notify(vm);
+
+
+    if (vm.count("help")) {
+        std::cout << description << "\n";
+        return 1;
+    }
+
+    const std::string fn = vm["input_data"].as<std::string>();
+    const std::string calibration_file = vm["calibration_file"].as<std::string>();
+    const std::string workspace = vm["workspace"].as<std::string>();
+
+    std::cout << "*********************************" << std::endl;
+    std::cout << "        fn        : " << fn << std::endl;
+    std::cout << " calibration_file : " << calibration_file << std::endl;
+
+    extrinsic_calib_vec = calib_struct::initializeCalib(calibration_file);
+
 
     std::vector<std::pair<Eigen::Vector3d,Eigen::Vector3d>> lines_3d{};
     int gizmed_line_id = -1;
@@ -331,7 +356,7 @@ int main(int argc, char **argv) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     /* Create a windowed mode window and its OpenGL context */
-    window = glfwCreateWindow(960, 540, "Backpack calib", NULL, NULL);
+    window = glfwCreateWindow(960, 540, "SPherical calib", NULL, NULL);
     if (!window){glfwTerminate(); return -1;}
     glfwSwapInterval(1);
     /* Make the window's context current */
@@ -365,35 +390,30 @@ int main(int argc, char **argv) {
     std::vector<float> draw_buffer_cloud;
     std::vector<unsigned int> draw_buffer_cloud_indices;
     pcl::PointCloud<pcl::PointXYZRGB> pc;
-    pcl::PointCloud<pcl::PointXYZINormal> pc_raw;
+    pcl::PointCloud<pcl::PointXYZINormal>::Ptr pc_raw_velo (new pcl::PointCloud<pcl::PointXYZINormal>);
 
-    pcl::io::loadPCDFile(workspace+"/1635402399_pointcloud_raw.pcd", pc_raw);
+    pcl::io::loadPCDFile(fn+"_pointcloud_raw_velodyne.pcd", *pc_raw_velo);
 
     // apply calibration
-    Eigen::Matrix4f bighead_calib = m3d_utils::loadMat("calib.txt").cast<float>();
+
     // gety ladybug calibration
-    ladybug_calibration.loadConfig(workspace+"/camera_params.ini");
+    ladybug_calibration.loadCfgFromString(kLadybugINIData);
 
 
-    pcl::PointCloud<pcl::PointXYZI> ouput;
-    pc.reserve(pc_raw.size());
-    for (int i = 0; i < pc_raw.size(); i++) {
+    pc.reserve(pc_raw_velo->size());
+    auto pcd3 = calib_struct::createTransformedPc(pc_raw_velo, extrinsic_calib_vec[2],encoder_offset[2]);
+    for (int i = 0; i < pcd3.size(); i++) {
         Eigen::Affine3f encoder_rot(Eigen::Affine3f::Identity());
-        const auto &p = pc_raw[i];
-        const float angle = -p.normal_x;
-        //std::cout << p.normal_x << std::endl;
-        Eigen::Affine3f transform(bigUnitCalib::getSE3OfLaser<float>(bighead_calib,angle));
+        const auto &p = pcd3[i];
+
         pcl::PointXYZRGB pt;
-        pt.getArray3fMap() = transform * p.getVector3fMap();
+        pt.getArray3fMap() = p.getVector3fMap();
         pt.r = p.intensity*255;
         pt.g = p.intensity*255;
         pt.b = p.intensity*255;
         pc.push_back(pt);
     }
-    //pcl::io::savePCDFile(workspace+"/pointcloud_transformed.pcd", pc);
-    //pcl::io::loadPCDFile("/tmp/cloud.pcd", pc);
 
-    //pcl::io::loadPCDFile("/mnt/540C28560C283580/dane_plecak/tests/front/25/cloud.pcd", pc);
 
     updateDrawingBufferWithColor(draw_buffer_cloud, draw_buffer_cloud_indices, pc, std::vector<cv::Mat>(),
             m3d_utils::ladybug_camera_calibration(), Eigen::Matrix4d());
@@ -408,18 +428,20 @@ int main(int argc, char **argv) {
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window, false);
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     glm::mat4 camera_matrix {glm::rotate(glm::mat4(1.0f), deg2rad(0.0f), glm::vec3(1, 0, 0))};
     glm::mat4 utility_matrix {glm::rotate(glm::mat4(1.0f), deg2rad(0.0f), glm::vec3(1, 0, 0))};
 
     Eigen::Map<Eigen::Matrix4f> camera_mat_map(&camera_matrix[0][0]);
-    camera_mat_map = getIntialCalib();
+    Eigen::Matrix<float,4,4> rot  =  Eigen::Matrix<float,4,4>::Identity();
+    rot.block<3,3>(0,0) = (Eigen::AngleAxisf(0.5f*M_PI, Eigen::Vector3f::UnitZ())).matrix();
 
+    camera_mat_map = rot*(Sophus::SE3f::exp(extrinsic_calib_vec[3]).inverse().matrix());
     std::vector<cv::Mat> camera_images;
     for (int i =0; i < 6; i++)
     {
-        const std::string img_fn = workspace+"/1635402399_ladybugPostProcess-rectified"+std::to_string(i)+"-0.jpg";
+        const std::string img_fn = fn+"_ladybugPostProcess-rectified"+std::to_string(i)+"-0.jpg";
         std::cout << "img_fn " << img_fn << std::endl;
         cv::Mat sphere_img_color = cv::imread(img_fn);
         cv::resize(sphere_img_color,sphere_img_color,cv::Size(2448,2048));
@@ -460,9 +482,12 @@ int main(int argc, char **argv) {
 
         ImGui::Begin("OBS");
         ImGui::Checkbox("camera_gizmo", &camera_gizmo);
-        if (ImGui::Button("reset")){
-            Eigen::Map<Eigen::Matrix4f> mat_map(&camera_matrix[0][0]);
-            mat_map = getIntialCalib();
+        if (ImGui::Button("RReset")){
+            Eigen::Map<Eigen::Matrix4f> camera_mat_map(&camera_matrix[0][0]);
+            Eigen::Matrix<float,4,4> rot  =  Eigen::Matrix<float,4,4>::Identity();
+            rot.block<3,3>(0,0) = (Eigen::AngleAxisf(0.5f*M_PI, Eigen::Vector3f::UnitZ())).matrix();
+
+            camera_mat_map = rot*(Sophus::SE3f::exp(extrinsic_calib_vec[3]).inverse().matrix());
         }
         if (ImGui::Button("update")) {
             gl_dirty = true;

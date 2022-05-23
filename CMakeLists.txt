@@ -176,7 +176,7 @@ endif()
 
 IF (${BUILD_GL_CALIB} STREQUAL "ON")	
 	find_package(OpenCV COMPONENTS core highgui calib3d REQUIRED)
-
+	add_definitions("-DWITH_OPENCV")
 	add_executable (gl_calib_livox gl_calib_livox/gl_calib_livox.cpp gl_calib_livox/structs.cpp)
 	#add_dependencies(node_native ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 	target_link_libraries(gl_calib_livox
@@ -190,17 +190,18 @@ IF (${BUILD_GL_CALIB} STREQUAL "ON")
 			${OPENGL_LIBRARIES}
 			GL_Codes
 			${CMAKE_DL_LIBS}
-			${CERES_LIBRARIES})
+			${CERES_LIBRARIES}
+			${OpenCV_LIBS})
 	
 	add_executable(gl_calib_velodyne gl_calib_velodyne/gl_calib_velodyne.cpp gl_calib_velodyne/utils.cpp )
 	target_link_libraries(gl_calib_velodyne
 			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
 
-	add_executable(gl_calib_spherical gl_calib_velodyne/shperical_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp)
+	add_executable(gl_calib_spherical gl_calib_velodyne/shperical_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp gl_calib_livox/structs.cpp)
 	target_link_libraries(gl_calib_spherical
 			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
 
-	add_executable(gl_calib_perspective gl_calib_velodyne/perspective_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp)
+	add_executable(gl_calib_perspective gl_calib_velodyne/perspective_line_calibration.cpp gl_calib_velodyne/utils.cpp gl_calib_velodyne/line_detector.cpp gl_calib_livox/structs.cpp)
 	target_link_libraries(gl_calib_perspective
 			${CERES_LIBRARIES} GL_Codes ${OPENGL_LIBRARIES} glfw ${GLEW_LIBRARIES} ${PCL_LIBRARIES} Boost::program_options ${OpenCV_LIBS})
 

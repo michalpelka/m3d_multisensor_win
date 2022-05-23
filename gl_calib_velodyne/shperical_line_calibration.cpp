@@ -6,6 +6,8 @@
 
 
 // optimizing and multihtrading
+#include "imgui/backends/imgui_impl_glfw.h"
+#include "imgui/backends/imgui_impl_opengl3.h"
 #include "tbb/tbb.h"
 #include <mutex>
 
@@ -16,7 +18,12 @@
 
 #include "cost_fun.h"
 #include "line_detector.h"
-
+#include <boost/program_options.hpp>
+#include <gl_calib_livox/structs.h>
+#include <static/ladybug_calib.hpp>
+std::vector<Sophus::Vector6f> extrinsic_calib_vec;
+const std::vector<float> encoder_offset{0,0,M_PI};
+m3d_utils::ladybug_camera_calibration ladybug_calibration;
 template<typename T> Sophus::SE3<T>  getSEFromParams(const T* const params)
 {
     Eigen::Map<const Eigen::Matrix<T,6,1>> eigen_laser_params(params);
@@ -133,7 +140,7 @@ struct CostFunctor{
     CostFunctor(const Eigen::Vector2d& line_in_spherical_image, const Vector6d& line_in_scene) :
             line_in_spherical_image(line_in_spherical_image), line_in_scene(line_in_scene){
 
-        const Eigen::Matrix3d transfer =(Eigen::AngleAxisd(-line_in_spherical_image.x()+M_PI/2, Eigen::Vector3d::UnitZ())*
+        const Eigen::Matrix3d transfer =(Eigen::AngleAxisd(-line_in_spherical_image.x()+M_PI, Eigen::Vector3d::UnitZ())*
                                          Eigen::AngleAxisd(line_in_spherical_image.y(), Eigen::Vector3d::UnitY())).matrix() ;
 
         moment_observed = transfer.col(2);
@@ -319,7 +326,7 @@ bool updateDrawingBufferWithColor(std::vector<float> &draw_buffer_cloud, std::ve
         {
             Eigen::Matrix<double,1,4> pt{p.x,p.y,p.z,1.0};
             Eigen::Matrix<double,4,4> rot  =  Eigen::Matrix<double,4,4>::Identity();
-            rot.block<3,3>(0,0) = (Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitZ())).matrix();
+            rot.block<3,3>(0,0) = (Eigen::AngleAxisd(0.0*M_PI, Eigen::Vector3d::UnitZ())).matrix();
             Eigen::Matrix<double,1,4> pt_cam = rot*sphere_odometry*pt.transpose();
 
             double alpha2 = std::atan2(pt_cam.x(),pt_cam.y());
@@ -343,28 +350,39 @@ bool updateDrawingBufferWithColor(std::vector<float> &draw_buffer_cloud, std::ve
 }
 int main(int argc, char **argv) {
 
-    std::string workspace(argv[1]);
-    std::cout << "workspace " << workspace << std::endl;
-    std::vector<std::string> extra_data{
-            workspace
-//        "/mnt/540C28560C283580/dane_plecak/tests/palak/test_side/",
-//        "/mnt/540C28560C283580/dane_plecak/tests/palak/test_in_0.25",
-//        "/mnt/540C28560C283580/dane_plecak/tests/palak/test_out_1"
-    };
-//    std::vector<std::pair<Eigen::Vector3d,Eigen::Vector3d>> lines{
-//            {{5,4,0},{5,-4,0}},
-//            {{5,4,3},{5,-4,3}},
-//            {{5,4,0},{5,4,3}},
-//            {{5,-4,0},{5,-4,3}},
-//    };
+    namespace po = boost::program_options;
+    po::options_description description("MyTool Usage");
 
-    std::vector<std::pair<Eigen::Vector3d,Eigen::Vector3d>> lines_3d{
-//            {{ 20.123195648193,0.494958996773,0.663995981216 },{20.132989883423,-4.984799861908,0.668256998062}},
-//            {{26.085592269897,0.671194970608,0.645429015160},{26.081626892090,-4.958352088928,0.642925977707}},
-//            {{19.998794555664,6.550938129425,-1.342049002647},{9.006967544556,6.566266059875,-1.356233000755}},
-//            {{14.487122535706,-4.847480773926,0.645928025246},{20.156965255737,-4.917168140411,0.578855991364}},
-//            {{20.137187957764,0.498082011938,1.042235016823},{14.730258941650,0.390141993761,1.088276982307}}
-    };
+    description.add_options()
+            ("help,h", "Display this help message")
+            ("input_data,i", po::value<std::string>(),"points to input data")
+            ("calibration_file,c",po::value<std::string>()->default_value("calibs.txt"), "calibration file")
+            ("workspace,w",po::value<std::string>()->default_value(""), "workspace where primitives are kept");
+    std::cout << description << "\n";
+    po::variables_map vm;
+    po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
+    po::notify(vm);
+
+
+    if (vm.count("help")) {
+        std::cout << description << "\n";
+        return 1;
+    }
+
+    const std::string fn = vm["input_data"].as<std::string>();
+    const std::string calibration_file = vm["calibration_file"].as<std::string>();
+    const std::string workspace = vm["workspace"].as<std::string>();
+
+    std::cout << "*********************************" << std::endl;
+    std::cout << "        fn        : " << fn << std::endl;
+    std::cout << " calibration_file : " << calibration_file << std::endl;
+
+    std::vector<std::string> extra_data{workspace};
+    extrinsic_calib_vec = calib_struct::initializeCalib(calibration_file);
+
+
+
+    std::vector<std::pair<Eigen::Vector3d,Eigen::Vector3d>> lines_3d{};
     int gizmed_line_id = -1;
 
     std::vector<Eigen::Vector3f> colors{{1,0,0},{0,1,0},{0,0,1},{1,0,1},{1,1,0},{1,1,1},{0,0,0}};
@@ -418,26 +436,31 @@ int main(int argc, char **argv) {
     pcl::PointCloud<pcl::PointXYZINormal> pc_raw;
     pcl::PointCloud<pcl::PointXYZRGB> pc;
 
-    pcl::io::loadPCDFile(workspace+"/1635402399_pointcloud_raw.pcd", pc_raw);
 
     // apply calibration
-    Eigen::Matrix4f bighead_calib = m3d_utils::loadMat("calib.txt").cast<float>();
-    pcl::PointCloud<pcl::PointXYZI> ouput;
-    pc.reserve(pc_raw.size());
-    for (int i = 0; i < pc_raw.size(); i++) {
+    pcl::PointCloud<pcl::PointXYZINormal>::Ptr pc_raw_velo (new pcl::PointCloud<pcl::PointXYZINormal>);
+
+    pcl::io::loadPCDFile(fn+"_pointcloud_raw_velodyne.pcd", *pc_raw_velo);
+
+    // apply calibration
+
+    // gety ladybug calibration
+    ladybug_calibration.loadCfgFromString(kLadybugINIData);
+
+
+    pc.reserve(pc_raw_velo->size());
+    auto pcd3 = calib_struct::createTransformedPc(pc_raw_velo, extrinsic_calib_vec[2],encoder_offset[2]);
+    for (int i = 0; i < pcd3.size(); i++) {
         Eigen::Affine3f encoder_rot(Eigen::Affine3f::Identity());
-        const auto &p = pc_raw[i];
-        const float angle = -p.normal_x;
-        //std::cout << p.normal_x << std::endl;
-        Eigen::Affine3f transform(bigUnitCalib::getSE3OfLaser<float>(bighead_calib,angle));
+        const auto &p = pcd3[i];
+
         pcl::PointXYZRGB pt;
-        pt.getArray3fMap() = transform * p.getVector3fMap();
+        pt.getArray3fMap() = p.getVector3fMap();
         pt.r = p.intensity*255;
         pt.g = p.intensity*255;
         pt.b = p.intensity*255;
         pc.push_back(pt);
     }
-
     //pcl::io::loadPCDFile("/tmp/cloud.pcd", pc);
 
     //pcl::io::loadPCDFile("/mnt/540C28560C283580/dane_plecak/tests/front/25/cloud.pcd", pc);
@@ -454,29 +477,15 @@ int main(int argc, char **argv) {
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window, false);
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     glm::mat4 camera_matrix {glm::rotate(glm::mat4(1.0f), deg2rad(0.0f), glm::vec3(1, 0, 0))};
     glm::mat4 utility_matrix {glm::rotate(glm::mat4(1.0f), deg2rad(0.0f), glm::vec3(1, 0, 0))};
 
-    const auto load_init = [&](){Eigen::Map<Eigen::Matrix4f> mat_map(&camera_matrix[0][0]);
-        mat_map = Eigen::Matrix4f::Identity();
-//    mat_map << 0.8264643549919128, -0.5520190596580505, -0.11059680581092834, 0.0,
-//            0.5173956155776978, 0.6672905683517456, 0.535747230052948, 0.0,
-//            -0.2219424992799759, -0.4999983310699463, 0.837104082107544, 2.0,
-//            0.0, 0.0, 0.0, 1.0;
 
-//        mat_map << 0.84239262342453, -0.42403846979141235, 0.33251482248306274, 0.0,
-//                0.44319528341293335, 0.8962000608444214, 0.020085996016860008, 0.0,
-//                -0.3065170347690582, 0.13044871389865875, 0.942884087562561, 2.0,
-//                0.0, 0.0, 0.0, 1.0;
+    Eigen::Map<Eigen::Matrix4f> camera_mat_map(&camera_matrix[0][0]);
+    camera_mat_map = Sophus::SE3f::exp(extrinsic_calib_vec[3]).inverse().matrix();
 
-//        mat_map << -0.059633541852235794, -0.9982203245162964, 0.0, 20.283273696899414,
-//                0.9982203245162964, -0.059633541852235794, 0.0, -2.5287961959838867,
-//                0.0, 0.0, 1.0, -0.46487948298454285,
-//                0.0, 0.0, 0.0, 1.0;
-    };
-    load_init();
     const int cols = 3840;
     const int rows = 1920;
     cv::Mat sphere_img1 = cv::Mat::zeros(rows, cols, CV_8UC3);
@@ -484,7 +493,7 @@ int main(int argc, char **argv) {
     //cv::Mat sphere_img_color = cv::imread("/home/michal/sphere_test.png");
     //cv::Mat sphere_img_color = cv::imread("/mnt/540C28560C283580/dane_plecak/tests/palak/test_25/cv.png");
     //cv::Mat sphere_img_color = cv::imread("/mnt/540C28560C283580/dane_plecak/tests/front/35/cv.png");
-    cv::Mat sphere_img_color = cv::imread(workspace+"/1635402399_ladybugPostProcessing-panoramic-0-radius_50.000000.jpg");
+    cv::Mat sphere_img_color = cv::imread(fn+"_ladybugPostProcessing-panoramic-0-radius_10.000000.jpg");
 
 
     sphere_img1 = sphere_img_color.clone();
@@ -526,7 +535,6 @@ int main(int argc, char **argv) {
 
         ImGui::Begin("OBS");
         ImGui::Checkbox("camera_gizmo",&camera_gizmo);
-        if (ImGui::Button("reset"))load_init();
         ImGui::Checkbox("draw_detection", &draw_det);
         for (int i =0; i< detected_lines.size(); i++)
         {
@@ -570,7 +578,11 @@ int main(int argc, char **argv) {
             lines_3d.push_back(std::pair<Eigen::Vector3d,Eigen::Vector3d>({{0, 0, 0}, {1, 0, 0}}));
         };
         ImGui::SameLine();
-
+        if (ImGui::Button("RReset")){
+            Eigen::Map<Eigen::Matrix4f> camera_mat_map(&camera_matrix[0][0]);
+            camera_mat_map = Sophus::SE3f::exp(extrinsic_calib_vec[3]).inverse().matrix();
+            std::cout << "extrinsic_calib_vec[3] " << extrinsic_calib_vec[3].transpose()<<std::endl;
+        }
         if (ImGui::Button("load")) {
             Eigen::Matrix4f m;
             loadLines(detected_lines, lines_3d, m, workspace);
@@ -791,7 +803,7 @@ int main(int argc, char **argv) {
                 const float inclination = std::acos(plucker_local.z() / z_dist);
                 const float azimuth = std::atan2(plucker_local.x(), plucker_local.y());
 
-                sphere_img1 = drawGreatCircle(sphere_img1, azimuth, inclination,cv::Vec3b(c.z() * 255, c.y() * 255, c.x() * 255));
+                sphere_img1 = drawGreatCircle(sphere_img1, azimuth+M_PI/2, inclination,cv::Vec3b(c.z() * 255, c.y() * 255, c.x() * 255));
 
             }
 
