@@ -453,6 +453,27 @@ const std::vector<Eigen::Vector2f> &m3d_utils::ladybug_camera_calibration::getCa
 }
 
 
+void m3d_utils::ladybug_camera_calibration::loadCfgFromString(const std::string &data){
+    std::stringstream  ss(data);
+    boost::property_tree::ptree pt;
+    boost::property_tree::ini_parser::read_ini(ss, pt);
+    this->camera_center.resize(6);
+    this->camera_extrinsic.resize(6);
+    this->camera_focal.resize(6);
+    for (int i =0; i < 6; i++)
+    {
+        camera_center[i].x() = pt.get<float>("camera"+std::to_string(i)+"_CameraCenterX");
+        camera_center[i].y() = pt.get<float>("camera"+std::to_string(i)+"_CameraCenterY");
+        camera_focal[i] = pt.get<float>("camera"+std::to_string(i)+"_FocalLen");
+        const float tx = pt.get<float>("camera"+std::to_string(i)+"_transX");
+        const float ty = pt.get<float>("camera"+std::to_string(i)+"_transY");
+        const float tz = pt.get<float>("camera"+std::to_string(i)+"_transZ");
+        const float rx = pt.get<float>("camera"+std::to_string(i)+"_rotX");
+        const float ry = pt.get<float>("camera"+std::to_string(i)+"_rotY");
+        const float rz = pt.get<float>("camera"+std::to_string(i)+"_rotZ");
+        camera_extrinsic[i] = makeTransformation(rx,ry,rz,tx,ty,tz).cast<float>();
+    }
+}
 void m3d_utils::ladybug_camera_calibration::loadConfig(const std::string &fn){
 
     boost::property_tree::ptree pt;

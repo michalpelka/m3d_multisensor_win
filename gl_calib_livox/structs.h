@@ -9,6 +9,8 @@
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/common/transforms.h>
+
+#include "transform.h"
 namespace calib_struct{
 	
     struct KeyFrame {
@@ -28,11 +30,6 @@ namespace calib_struct{
 
     std::shared_ptr<float[]> pclToBuffer(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud, int& len, float scale);
 
-    std::vector<Sophus::Vector6f> initializeCalib();
-
-    std::vector<Sophus::Vector6f> initializeCalib(const std::string& fn);
-    
-    pcl::PointCloud<pcl::PointXYZINormal> createTransformedPc(const pcl::PointCloud<pcl::PointXYZINormal>::Ptr& raw, Sophus::Vector6f& calib, float offset);
 
     struct plane {
         Eigen::Matrix4f matrix{ Eigen::Matrix4f::Identity() };
