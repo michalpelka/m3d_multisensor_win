@@ -48,15 +48,15 @@ void cursor_calback(GLFWwindow* window, double xpos, double ypos)
         const glm::vec2 p{ -xpos, ypos };
         const auto d = clicked_point - p;
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
-            rot_x += 0.01 * d[1];
-            rot_y += 0.01 * d[0];
+            rot_x += 0.05 * d[1];
+            rot_y += 0.05 * d[0];
         }
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2) == GLFW_PRESS) {
             view_translation[2] += 0.02 * d[1];
         }
         if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_3) == GLFW_PRESS) {
-            view_translation[1] += 0.01 * d[1];
-            view_translation[0] -= 0.01 * d[0];
+            view_translation[1] += 0.05 * d[1];
+            view_translation[0] -= 0.05 * d[0];
         }
         clicked_point = p;
     }

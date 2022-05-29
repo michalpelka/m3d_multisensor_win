@@ -6,7 +6,7 @@
 #include <boost/bind.hpp>
 #include <thread>
 #include <mutex>
-#include <set>nc
+#include <set>
 #include "mavlink/3dunit/mavlink.h"
 
 constexpr size_t kBufferMaxSize = 500;

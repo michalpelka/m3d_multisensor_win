@@ -81,6 +81,8 @@ public:
                 pt.put("status.saved_files." + p.first, p.second);
             }
         }
+        using namespace std::literals;
+        std::this_thread::sleep_for(10s);
         pt.put("status.board.msgs", (int)client1->getEncoder_msgs_count());
         pt.put("status.board.angle", client1->getEncoderLast().angle);
         pt.put("status.board.rotated", client1->getRotatedRadians());
@@ -402,8 +404,10 @@ public:
             int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
             std::thread ladybug_th{ [=]() {
                 try {
+#ifdef WITH_LADYBUG
                     captureLadybugImage(file_server::repo + std::to_string(timestamp) + "_");
                     reportFileSaving("Ladybug");
+#endif
                 }
                 catch (std::exception& err) {
                    std::cerr <<  std::string(err.what());
