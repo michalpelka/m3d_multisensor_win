@@ -81,8 +81,6 @@ public:
                 pt.put("status.saved_files." + p.first, p.second);
             }
         }
-        using namespace std::literals;
-        std::this_thread::sleep_for(10s);
         pt.put("status.board.msgs", (int)client1->getEncoder_msgs_count());
         pt.put("status.board.angle", client1->getEncoderLast().angle);
         pt.put("status.board.rotated", client1->getRotatedRadians());

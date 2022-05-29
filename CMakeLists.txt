@@ -165,7 +165,6 @@ target_link_libraries(collapse_data ${PCL_COMMON_LIBRARY}
 		${PCL_IO_LIBRARY}
 		${PCL_OCTREE_LIBRARY}
 		${Boost_LIBRARIES}
-		${OpenCV_LIBS}
 )
 
 IF (${BUILD_GL_VIEVER} STREQUAL "ON")	

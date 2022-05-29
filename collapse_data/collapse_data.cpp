@@ -18,8 +18,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <3rd/stb_image.h>
 
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/opencv.hpp>
+#include <chrono>
+#include <thread>
 
 class ladybug_camera_calibration{
 public:
@@ -102,8 +102,11 @@ void ladybug_camera_calibration::loadCfgFromString(const std::string &data){
 
 bool updateDrawingBufferWithColor(pcl::PointCloud<pcl::PointXYZRGBL>& color_pointcloud,
                                   const pcl::PointCloud<pcl::PointXYZI> &pc,
-                                  const std::vector<cv::Mat> &images, const ladybug_camera_calibration &ladybug_calibration,
-                                  const Eigen::Matrix4d& calibration_camera){
+                                  const ladybug_camera_calibration &ladybug_calibration,
+                                  const Eigen::Matrix4d& calibration_camera,
+                                  const std::vector<std::unique_ptr<unsigned char>>& images,
+                                  const Eigen::Vector2i& size,
+                                  const int channels){
     color_pointcloud.clear();
     color_pointcloud.reserve(pc.size());
 
@@ -113,7 +116,7 @@ bool updateDrawingBufferWithColor(pcl::PointCloud<pcl::PointXYZRGBL>& color_poin
 
             //Eigen::Matrix<double,1,4> pt_cam = camera_extrinsic_loc.inverse()*sphere_odometry.inverse()*pt.transpose();
             float distance_to_center_min = std::numeric_limits<float>::max();
-            cv::Vec3b best_color;
+            Eigen::Vector3i best_color;
             for (int camera_id = 0; camera_id < images.size(); camera_id++) {
                 Eigen::Matrix<double, 1, 4> pt{p.x, p.y, p.z, 1.0};
                 Eigen::Matrix<double, 4, 4> ladybug_loc_calib = ladybug_calibration.getCameraExtrinsic()[camera_id].cast<double>();
@@ -127,14 +130,18 @@ bool updateDrawingBufferWithColor(pcl::PointCloud<pcl::PointXYZRGBL>& color_poin
                 double distance_to_center = xx * xx + yy * yy;
                 const double xx2 = xx + camera_center.x();
                 const double yy2 = yy + camera_center.y();
-                const auto &img = images[camera_id];
+                const unsigned char* img = images[camera_id].get();
                 if (distance_to_center < distance_to_center_min && pt_cam.z() > 0 && xx2 > 0 && yy2 > 0 &&
-                    xx2 < img.cols && yy2 < img.rows) {
+                    xx2 < size.y() && yy2 < size.x()) {
                     distance_to_center_min = distance_to_center;
-                    best_color = img.at<cv::Vec3b>(yy2, xx2);
+                    size_t loc = (int)yy2* size.y()*channels + (int)xx2*channels;
+
+                    unsigned char r1 = img[loc];
+                    unsigned char g1 = img[loc+1];
+                    unsigned char b1 = img[loc+2];
+                    best_color = Eigen::Vector3i{r1,g1,b1};
+
                 }
-
-
             }
             if (distance_to_center_min != std::numeric_limits<float>::max()) {
                 pcl::PointXYZRGBL rgb_p;
@@ -174,6 +181,7 @@ int main(int argc, char** argv) {
     po::variables_map vm;
     po::store(po::command_line_parser(argc, argv).options(description).run(), vm);
     po::notify(vm);
+    const bool watch {vm["watch"].as<bool>()};
 
     if (vm.count("help")) {
         std::cout << description << "\n";
@@ -184,142 +192,167 @@ int main(int argc, char** argv) {
 
     if (vm.count("input_data"))
     {
-        if (vm["watch"].as<bool>())
+        if (watch)
         {
             std::cout << "cannot watch file" << std::endl;
             std::abort();
         }
         files = {vm["input_data"].as<std::string>()};
     }
-    if (vm.count("input_dir"))
-    {
-        boost::regex fn_regex ("\\d{10}.json");
-        const boost::filesystem::path dir_to_scan(vm["input_dir"].as<std::string>());
-        boost::filesystem::directory_iterator end_itr;
-        for (boost::filesystem::directory_iterator itr(dir_to_scan); itr != end_itr; ++itr)
-        {
-            if (is_regular_file(itr->path())) {
-                boost::smatch match;
-                const std::string current_file = itr->path().string();
-                if (boost::regex_search(current_file, match, fn_regex)){
-                    const auto scanned_file = dir_to_scan/itr->path().stem();
-                    std::cout << "scanned_file " << scanned_file << std::endl;
-                    files.emplace_back(scanned_file.string());
+    do {
+        if (vm.count("input_dir")) {
+            boost::regex fn_regex("\\d{10}.json");
+            const boost::filesystem::path dir_to_scan(vm["input_dir"].as<std::string>());
+            boost::filesystem::directory_iterator end_itr;
+            for (boost::filesystem::directory_iterator itr(dir_to_scan); itr != end_itr; ++itr) {
+                if (is_regular_file(itr->path())) {
+                    boost::smatch match;
+                    const std::string current_file = itr->path().string();
+                    if (boost::regex_search(current_file, match, fn_regex)) {
+                        const auto scanned_file = dir_to_scan / itr->path().stem();
+                        std::cout << "scanned_file " << scanned_file << std::endl;
+                        files.emplace_back(scanned_file.string());
+                    }
                 }
             }
         }
+
+        for (const auto &fn : files) {
+
+            const std::string calibration_file = vm["calibration_file"].as<std::string>();
+            const std::string output_dir = vm["output_dir"].as<std::string>();
+            const boost::filesystem::path p(fn);
+            const boost::filesystem::path p2(output_dir);
+            const std::string target_pcd = (p2 / p.stem()).string() + ".pcd";
+            const std::string target_pcd_color = (p2 / p.stem()).string() + "_color.pcd";
+            const bool with_ladybug = vm["ladybug"].as<bool>();
+
+            boost::filesystem::create_directory(output_dir);
+            std::cout << "*********************************" << std::endl;
+            std::cout << "        fn        : " << fn << std::endl;
+            std::cout << " calibration_file : " << calibration_file << std::endl;
+            std::cout << " output_dir       : " << output_dir << std::endl;
+            std::cout << " target_pcd       : " << target_pcd << std::endl;
+            std::cout << " with ladybug     : " << with_ladybug << std::endl;
+
+            if (boost::filesystem::exists(target_pcd)) {
+                std::cout << "target exists " << target_pcd << std::endl;
+                continue;
+            }
+
+            extrinsic_calib_vec = calib_struct::initializeCalib(calibration_file);
+
+            pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZINormal>);
+            pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn + "_pointcloud_raw_livox_1.pcd", *cloud2);
+            pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZINormal>);
+            pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn + "_pointcloud_raw_livox_2.pcd", *cloud1);
+            pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_velo(new pcl::PointCloud<pcl::PointXYZINormal>);
+            pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn + "_pointcloud_raw_velodyne.pcd", *cloud_velo);
+
+
+            auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0],
+                                                          encoder_offset[0]).makeShared();
+            auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1],
+                                                          encoder_offset[1]).makeShared();
+            auto pcd3 = calib_struct::createTransformedPc(cloud_velo, extrinsic_calib_vec[2],
+                                                          encoder_offset[2]).makeShared();
+            const std::array<pcl::PointCloud<pcl::PointXYZINormal>::Ptr, 3> pcds = {pcd1, pcd2, pcd3};
+
+            pcl::PointCloud<pcl::PointXYZI> output;
+            std::default_random_engine generator;
+            std::uniform_real_distribution<float> distribution(0.0, 800.0);
+
+            Eigen::Affine3f rot2(Eigen::Affine3f::Identity());
+            rot2.rotate(Eigen::AngleAxisf(-M_PI / 2, Eigen::Vector3f::UnitZ()));
+
+            const std::vector<float> prob_mods = {1, 1, 10};
+            for (int i = 0; i < prob_mods.size(); i++) {
+                const auto pc = pcds[i];
+                float prob_mod = prob_mods[i];
+                output.reserve(output.size() + pc->size());
+                for (const auto &p : *pc) {
+                    pcl::PointXYZI tp;
+                    Eigen::Vector3f ep = rot2 * p.getArray3fMap();
+                    float distance = ep.norm();
+                    float distance_random = distribution(generator);
+                    if (distance * prob_mod > distance_random && distance > 1) {
+                        tp.getArray3fMap() = ep;
+                        tp.intensity = distance;
+                        output.push_back(tp);
+                    }
+                }
+            }
+
+
+            if (with_ladybug) {
+                std::cout << "processing ladybug" << std::endl;
+                bool is_ok = true;
+                std::vector<boost::filesystem::path> photos;
+                std::vector<std::unique_ptr<unsigned char>> images;
+                Eigen::Vector2i image_size;
+                int image_channels;
+                for (int i = 0; i < 6; i++) {
+                    // load calib
+                    photos.push_back(fn + "_ladybugPostProcess-rectified" + std::to_string(i) + "-0.jpg");
+                    if (!boost::filesystem::exists(photos.back())) {
+                        std::cout << "skiping ladybug, file not found " << photos.back() << std::endl;
+                        is_ok = false;
+                        break;
+                    }
+                }
+
+                if (is_ok) {
+                    for (int i = 0; i < 6; i++) {
+                        //                      images.push_back(cv::imread());
+                        int width, height, channels;
+                        std::unique_ptr<unsigned char> ptr = std::unique_ptr<unsigned char>(
+                                stbi_load(photos[i].string().c_str(), &width, &height, &channels, 0));
+                        if (i == 0) {
+                            image_size = Eigen::Vector2i{height, width};
+                            image_channels = channels;
+                        } else {
+                            if (!(image_size.y() == width && image_size.x() == height)) {
+                                is_ok = false;
+                                std::cout << "image_size is not consitent " << image_size << std::endl;
+                            }
+                            if (channels != image_channels) {
+                                is_ok = false;
+                                std::cout << "image_channels is not consitent " << image_channels << std::endl;
+                            }
+
+                        }
+                        images.emplace_back(std::move(ptr));
+
+                    }
+                    if (is_ok) {
+                        ladybug_camera_calibration ladybug_calib;
+                        ladybug_calib.loadCfgFromString(kLadybugINIData);
+                        //load images
+
+                        pcl::PointCloud<pcl::PointXYZRGBL> color_pointcloud;
+                        Eigen::Matrix4d extrinsic_calib_ld = Sophus::SE3f::exp(
+                                extrinsic_calib_vec.back()).inverse().matrix().cast<double>();
+                        updateDrawingBufferWithColor(color_pointcloud, output, ladybug_calib, extrinsic_calib_ld,
+                                                     images, image_size, image_channels);
+                        std::cout << "processing ladybug - size " << color_pointcloud.size() << std::endl;
+                        if (color_pointcloud.size() > 0) {
+                            std::cout << "saving " << target_pcd_color << std::endl;
+                            pcl::io::savePCDFileBinary(target_pcd_color, color_pointcloud);
+                        }
+                    }
+                }
+
+            }
+            if (output.size() > 0) {
+                pcl::io::savePCDFileBinary(target_pcd, output);
+                if (boost::filesystem::exists(fn + "_odom.txt")) {
+                    boost::filesystem::copy_file(fn + "_odom.txt", (p2 / p.stem()).string() + ".txt");
+                }
+            }
+        }
+    if (watch){
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(2000ms);
     }
-    for (const auto &fn : files) {
-
-        const std::string calibration_file = vm["calibration_file"].as<std::string>();
-        const std::string output_dir = vm["output_dir"].as<std::string>();
-        const boost::filesystem::path p(fn);
-        const boost::filesystem::path p2(output_dir);
-        const std::string target_pcd = (p2 / p.stem()).string() + ".pcd";
-        const std::string target_pcd_color = (p2 / p.stem()).string() + "_color.pcd";
-        const bool with_ladybug = vm["ladybug"].as<bool>();
-        std::cout << "*********************************" << std::endl;
-        std::cout << "        fn        : " << fn << std::endl;
-        std::cout << " calibration_file : " << calibration_file << std::endl;
-        std::cout << " output_dir       : " << output_dir << std::endl;
-        std::cout << " target_pcd       : " << target_pcd << std::endl;
-        std::cout << " with ladybug     : " << with_ladybug << std::endl;
-
-        if (boost::filesystem::exists(target_pcd))
-        {
-            std::cout << "target exists " << target_pcd << std::endl;
-            continue;
-        }
-
-        extrinsic_calib_vec = calib_struct::initializeCalib(calibration_file);
-
-        pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud2(new pcl::PointCloud<pcl::PointXYZINormal>);
-        pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn + "_pointcloud_raw_livox_1.pcd", *cloud2);
-        pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud1(new pcl::PointCloud<pcl::PointXYZINormal>);
-        pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn + "_pointcloud_raw_livox_2.pcd", *cloud1);
-        pcl::PointCloud<pcl::PointXYZINormal>::Ptr cloud_velo(new pcl::PointCloud<pcl::PointXYZINormal>);
-        pcl::io::loadPCDFile<pcl::PointXYZINormal>(fn + "_pointcloud_raw_velodyne.pcd", *cloud_velo);
-
-
-        auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0], encoder_offset[0]).makeShared();
-        auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1], encoder_offset[1]).makeShared();
-        auto pcd3 = calib_struct::createTransformedPc(cloud_velo, extrinsic_calib_vec[2],
-                                                      encoder_offset[2]).makeShared();
-        const std::array<pcl::PointCloud<pcl::PointXYZINormal>::Ptr, 3> pcds = {pcd1, pcd2, pcd3};
-
-        pcl::PointCloud<pcl::PointXYZI> output;
-        std::default_random_engine generator;
-        std::uniform_real_distribution<float> distribution(0.0, 500.0);
-
-        Eigen::Affine3f rot2(Eigen::Affine3f::Identity());
-        rot2.rotate(Eigen::AngleAxisf(-M_PI / 2, Eigen::Vector3f::UnitZ()));
-
-        const std::vector<float> prob_mods = {1, 1, 10};
-        for (int i = 0; i < prob_mods.size(); i++) {
-            const auto pc = pcds[i];
-            float prob_mod = prob_mods[i];
-            output.reserve(output.size() + pc->size());
-            for (const auto &p : *pc) {
-                pcl::PointXYZI tp;
-                Eigen::Vector3f ep = rot2 * p.getArray3fMap();
-                float distance = ep.norm();
-                float distance_random = distribution(generator);
-                if (distance * prob_mod > distance_random && distance > 1) {
-                    tp.getArray3fMap() = ep;
-                    tp.intensity = distance;
-                    output.push_back(tp);
-                }
-            }
-        }
-
-
-        if (with_ladybug)
-        {
-            std::cout << "processing ladybug" << std::endl;
-            bool is_ok = true;
-            std::vector<boost::filesystem::path> photos;
-            std::vector<cv::Mat> images;
-
-            Eigen::Vector2i image_size;
-            int image_channels;
-            for (int i=0; i < 6; i++)
-            {
-                // load calib
-                photos.push_back(fn+"_ladybugPostProcess-rectified"+std::to_string(i)+"-0.jpg");
-                if (!boost::filesystem::exists(photos.back())) {
-                    std::cout << "skiping ladybug, file not found " << photos.back() << std::endl;
-                    is_ok = false;
-                    break;
-                }
-            }
-
-            if (is_ok)
-            {
-                for (int i=0; i < 6; i++){
-                    images.push_back(cv::imread(photos[i].string()));
-                }
-
-                ladybug_camera_calibration ladybug_calib;
-                ladybug_calib.loadCfgFromString(kLadybugINIData);
-                //load images
-
-                pcl::PointCloud<pcl::PointXYZRGBL> color_pointcloud;
-                Eigen::Matrix4d extrinsic_calib_ld = Sophus::SE3f::exp(extrinsic_calib_vec.back()).inverse().matrix().cast<double>();
-                updateDrawingBufferWithColor(color_pointcloud, output, images, ladybug_calib, extrinsic_calib_ld);
-                std::cout << "processing ladybug - size " << color_pointcloud.size()  << std::endl;
-                if (color_pointcloud.size()>0){
-                    std::cout << "saving " << target_pcd_color << std::endl;
-                    pcl::io::savePCDFileBinary(target_pcd_color, color_pointcloud);
-                }
-            }
-
-        }
-        if (output.size()>0) {
-            pcl::io::savePCDFileBinary(target_pcd, output);
-            if(boost::filesystem::exists(fn + "_odom.txt"))
-            {
-                boost::filesystem::copy_file(fn + "_odom.txt", (p2 / p.stem()).string() + ".txt");
-            }
-        }
-    }
+    }while(watch);
 };

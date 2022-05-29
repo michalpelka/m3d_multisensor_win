@@ -119,21 +119,7 @@ boost::property_tree::ptree m3d_utils::TestPlane::serialize() const
     {
         ss << cb[i] << " ";
     }
-    pt.put("T",ss.str());  class ladybug_camera_calibration{
-    public:
-        void loadConfig(const std::string &fn);
-        void loadCfgFromString(const std::string &data);
-        const std::vector<Eigen::Matrix4f> &getCameraExtrinsic() const;
-        const std::vector<float> &getCameraFocal() const;
-        const std::vector<Eigen::Vector2f> &getCameraCenter() const;
-
-    private:
-        static Eigen::Matrix4d makeTransformation( const double rotX, const double rotY, const double rotZ, const double transX, const double transY, const double transZ);
-        std::vector<Eigen::Matrix4f> camera_extrinsic;
-        std::vector<float> camera_focal;
-        std::vector<Eigen::Vector2f> camera_center;
-
-    };
+    pt.put("T",ss.str());
     return pt;
 }
 std::vector<Eigen::Vector2d> m3d_utils::detectMarkerInImage(const cv::Mat &input_image, const cv::Mat& marker)

@@ -40,7 +40,8 @@ namespace m3d_utils {
         std::vector<Eigen::Matrix4f> camera_extrinsic;
         std::vector<float> camera_focal;
         std::vector<Eigen::Vector2f> camera_center;
-        
+
+
     };
     Eigen::Matrix4d loadMat(const std::string& fn);
     void saveMat(const std::string& fn, const Eigen::Matrix4d& mat);
