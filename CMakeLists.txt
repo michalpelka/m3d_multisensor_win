@@ -22,6 +22,9 @@ else()
 	SET(LADYBUG_LIBS ${LADYBUG_SDK}/lib64/ladybug.lib ladybug_capture)
 endif()
 
+SET(SOPHUS_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/3rd/Sophus)
+add_definitions(-DSOPHUS_USE_BASIC_LOGGING)
+include_directories( ${SOPHUS_INCLUDE_DIRS})
 
 IF (${BUILD_GL_VIEVER} STREQUAL "ON")
 	find_package (Eigen3 REQUIRED)
