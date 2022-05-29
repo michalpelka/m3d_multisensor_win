@@ -402,8 +402,10 @@ public:
             int64_t timestamp = duration_cast<seconds>(aggregation_deadline.time_since_epoch()).count();
             std::thread ladybug_th{ [=]() {
                 try {
+#ifdef WITH_LADYBUG
                     captureLadybugImage(file_server::repo + std::to_string(timestamp) + "_");
                     reportFileSaving("Ladybug");
+#endif
                 }
                 catch (std::exception& err) {
                    std::cerr <<  std::string(err.what());

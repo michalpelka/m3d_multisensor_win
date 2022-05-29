@@ -100,7 +100,7 @@ void file_server::fn(struct mg_connection* c, int ev, void* ev_data, void* fn_da
 
         if (mg_http_match_uri(hm, "/index")) {
             using namespace std;
-            ifstream file ("index.htm", 'r');
+            ifstream file ("index.htm");
             std::stringstream buffer;
             buffer << file.rdbuf();
             mg_http_reply(c, 200, "Access-Control-Allow-Origin: *\n", buffer.str().c_str());

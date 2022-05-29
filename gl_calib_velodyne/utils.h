@@ -127,8 +127,4 @@ namespace m3d_utils {
     void saveCFG(const std::vector<double> &laser1_config, const std::vector<double> &camera1_config);
 
     void tryLoadCFG(std::vector<double> &laser1_config, std::vector<double> &camera1_config);
-
-
-
-
 }
