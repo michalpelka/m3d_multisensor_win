@@ -146,9 +146,9 @@ bool updateDrawingBufferWithColor(pcl::PointCloud<pcl::PointXYZRGBL>& color_poin
             if (distance_to_center_min != std::numeric_limits<float>::max()) {
                 pcl::PointXYZRGBL rgb_p;
                 rgb_p.getArray3fMap() = p.getArray3fMap();
-                rgb_p.r = best_color[2];
+                rgb_p.r = best_color[0];
                 rgb_p.g = best_color[1];
-                rgb_p.b = best_color[0];
+                rgb_p.b = best_color[2];
                 color_pointcloud.push_back(rgb_p);
             }
         }
@@ -275,7 +275,7 @@ int main(int argc, char** argv) {
                     Eigen::Vector3f ep = rot2 * p.getArray3fMap();
                     float distance = ep.norm();
                     float distance_random = distribution(generator);
-                    if (distance * prob_mod > distance_random && distance > 1) {
+                    if (true || distance * prob_mod > distance_random && distance > 1) {
                         tp.getArray3fMap() = ep;
                         tp.intensity = distance;
                         output.push_back(tp);
