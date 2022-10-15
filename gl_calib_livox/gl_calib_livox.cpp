@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
         glm::mat4 model_rotation_2 = glm::rotate(model_rotation_1, rot_y, glm::vec3(0.0f, 0.0f, 1.0f));
         glm::mat4 model_rotation_3 = glm::rotate(model_rotation_2, (float)(0.5f * M_PI), glm::vec3(-1.0f, 0.0f, 0.0f));
 
-        if (plane_edited > -1)
+        if (plane_edited > -1 && calibration_planes.size()>0)
         {
             Eigen::Matrix4f gizmo_mat{ calibration_planes[plane_edited].getGizmo()};
             ImGuizmo::Manipulate(&model_rotation_2[0][0], &proj[0][0], ImGuizmo::TRANSLATE_Z | ImGuizmo::TRANSLATE_Y | ImGuizmo::TRANSLATE_X | ImGuizmo::ROTATE_Y | ImGuizmo::ROTATE_Z | ImGuizmo::ROTATE_X,
@@ -323,119 +323,6 @@ int main(int argc, char** argv) {
 
         }
 
-        if (ImGui::Button("LoadPlanes")) {
-            calibration_planes = calib_struct::loadPlanes(plane_file);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("SavePlanes")) {
-            calib_struct::savePlanes(calibration_planes, plane_file);
-        }
-        for (int i = 0; i < calibration_planes.size(); i++)
-        {
-            char b[256];
-            snprintf(b, 256, "edit_plane%d", i);
-            if (ImGui::Button(b)) {
-                plane_edited = i;
-            }
-            ImGui::SameLine();
-            snprintf(b, 256, "rem_plane%d", i);
-            if (ImGui::Button(b)) {
-                calibration_planes.erase(calibration_planes.begin() + i);
-                break;
-            }
-            ImGui::SameLine();
-            snprintf(b, 256, "hv%d", i);
-            float* f = calibration_planes[i].size.data();
-            ImGui::InputFloat2(b,f);
-            ImGui::SameLine();
-            snprintf(b, 256, "export plane %d", i);
-            if (ImGui::Button(b)) {
-
-                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0],encoder_offset[0]);
-                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1],encoder_offset[1]);
-                auto pcd3 = calib_struct::createTransformedPc(cloud_velo, extrinsic_calib_vec[2],encoder_offset[2]);
-
-                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ pcd1,pcd2, pcd3 };
-                pcl::io::savePCDFileBinary("test1_pcd.pcd", pcd1);
-                pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd2);
-                pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd3);
-
-                auto plane_se3 = calibration_planes[i].matrix;
-                auto plane_size = calibration_planes[i].size;
-                auto plane_se3_inv = plane_se3.inverse();
-
-                Eigen::Vector3f plane_vec_inv = plane_se3_inv.block<1, 3>(1, 3);
-                for (int j = 0; j < pcds.size(); j++)
-                {
-                    auto& pcd = pcds[j];
-                    pcl::PointCloud<pcl::PointXYZL> cloud;
-                    cloud.reserve(cloud.size() + pcd.size());
-                    for (int i = 0; i < pcd.size(); i++) {
-                        //Eigen::Vector3f p = pcd[i].getArray3fMap() - plane_vec_inv;
-                        pcl::PointXYZL pi;
-                        pi.label = j;
-                        Eigen::Vector4f p = pcd[i].getArray4fMap();
-                        pi.getArray4fMap() = plane_se3_inv * p ;
-                        if (abs(pi.x) < plane_size.x() && abs(pi.y) < plane_size.y() && abs(pi.z) < 2.0) {
-                            cloud.push_back(pi);
-                        }
-
-                    }
-                    snprintf(b, 256, "cloud_plane%d_cloud%d.pcd", i,j);
-                    pcl::io::savePCDFileBinary(b, cloud);
-                }
-
-            }
-            snprintf(b, 256, "svd %d", i);
-            ImGui::SameLine();
-            if (ImGui::Button(b)) {
-
-                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ };
-
-                for (int i =0; i <locked_params.size(); i++){
-                    if (locked_params[i]) {
-                        pcds.emplace_back(
-                                calib_struct::createTransformedPc(raw_pointclouds[i], extrinsic_calib_vec[i], encoder_offset[i]));
-                    }
-                }
-
-                std::vector<Eigen::Vector4f> cloud;
-
-                auto plane_se3 = calibration_planes[i].matrix;
-                auto plane_size = calibration_planes[i].size;
-
-                auto plane_se3_inv = plane_se3.inverse();
-
-                Eigen::Vector3f plane_vec_inv = plane_se3_inv.block<1, 3>(1, 3);
-                for (int j = 0; j < pcds.size(); j++)
-                {
-                    auto& pcd = pcds[j];
-                    cloud.reserve(cloud.size() + pcd.size());
-                    for (int i = 0; i < pcd.size(); i++) {
-                        Eigen::Vector4f p = pcd[i].getArray4fMap();
-                        Eigen::Vector4f pi = plane_se3_inv * p;
-                        if (abs(pi.x()) < plane_size.x() && abs(pi.y()) < plane_size.y() && abs(pi.z()) < 1) {
-                            cloud.push_back(p);
-                        }
-                    }
-                }
-                const Eigen::Vector4f avg_center = calib_struct::avgT<Eigen::Vector4f>(cloud);
-                Eigen::Matrix3f covariance = calib_struct::findCovariance(cloud, avg_center);
-                Eigen::JacobiSVD<Eigen::Matrix3f> svd(covariance, Eigen::ComputeFullV);
-
-                calibration_planes[i].matrix = Eigen::Matrix4f::Identity();
-                Eigen::Vector3f z = svd.matrixV().col(2);
-                calibration_planes[i].matrix.block<3, 3>(0, 0).col(2) = z;
-                calibration_planes[i].matrix.block<3, 3>(0, 0).col(1) = z.cross(Eigen::Vector3f{ 1,0,0 });
-                calibration_planes[i].matrix.block<3, 3>(0, 0).col(0) = z.cross(Eigen::Vector3f{ 0,0,1 });
-
-                calibration_planes[i].matrix.block<4, 1>(0, 3) = avg_center;
-            }
-
-        }
-        if (ImGui::Button("add_plane")) {
-            calibration_planes.resize(calibration_planes.size() + 1);
-        }
         if (ImGui::Button("calib")){
             ceres::Problem problem;
             std::vector<Eigen::Vector4d> plane_params;
@@ -526,6 +413,128 @@ int main(int argc, char** argv) {
             for (int i = 0; i < calibration_planes.size(); i++){
                 calibration_planes[i].setABCD(plane_params[i].cast<float>());
             }
+
+        }
+
+        ImGui::End();
+
+        ImGui::Begin("Planes");
+
+        if (ImGui::Button("LoadPlanes")) {
+            calibration_planes = calib_struct::loadPlanes(plane_file);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("SavePlanes")) {
+            calib_struct::savePlanes(calibration_planes, plane_file);
+        }
+        if (ImGui::Button("Add Plane")) {
+            calibration_planes.resize(calibration_planes.size() + 1);
+        }
+
+        for (int i = 0; i < calibration_planes.size(); i++)
+        {
+            char b[256];
+            snprintf(b, 256, "plane %d:", i);
+            ImGui::Text(b);
+            snprintf(b, 256, "edit_plane%d", i);
+            if (ImGui::Button(b)) {
+                plane_edited = i;
+            }
+            snprintf(b, 256, "svd %d", i);
+            ImGui::SameLine();
+            if (ImGui::Button(b)) {
+
+                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ };
+
+                for (int i =0; i <locked_params.size(); i++){
+                    if (locked_params[i]) {
+                        pcds.emplace_back(
+                                calib_struct::createTransformedPc(raw_pointclouds[i], extrinsic_calib_vec[i], encoder_offset[i]));
+                    }
+                }
+
+                std::vector<Eigen::Vector4f> cloud;
+
+                auto plane_se3 = calibration_planes[i].matrix;
+                auto plane_size = calibration_planes[i].size;
+
+                auto plane_se3_inv = plane_se3.inverse();
+
+                Eigen::Vector3f plane_vec_inv = plane_se3_inv.block<1, 3>(1, 3);
+                for (int j = 0; j < pcds.size(); j++)
+                {
+                    auto& pcd = pcds[j];
+                    cloud.reserve(cloud.size() + pcd.size());
+                    for (int i = 0; i < pcd.size(); i++) {
+                        Eigen::Vector4f p = pcd[i].getArray4fMap();
+                        Eigen::Vector4f pi = plane_se3_inv * p;
+                        if (abs(pi.x()) < plane_size.x() && abs(pi.y()) < plane_size.y() && abs(pi.z()) < 1) {
+                            cloud.push_back(p);
+                        }
+                    }
+                }
+                const Eigen::Vector4f avg_center = calib_struct::avgT<Eigen::Vector4f>(cloud);
+                Eigen::Matrix3f covariance = calib_struct::findCovariance(cloud, avg_center);
+                Eigen::JacobiSVD<Eigen::Matrix3f> svd(covariance, Eigen::ComputeFullV);
+
+                calibration_planes[i].matrix = Eigen::Matrix4f::Identity();
+                Eigen::Vector3f z = svd.matrixV().col(2);
+                calibration_planes[i].matrix.block<3, 3>(0, 0).col(2) = z;
+                calibration_planes[i].matrix.block<3, 3>(0, 0).col(1) = z.cross(Eigen::Vector3f{ 1,0,0 });
+                calibration_planes[i].matrix.block<3, 3>(0, 0).col(0) = z.cross(Eigen::Vector3f{ 0,0,1 });
+
+                calibration_planes[i].matrix.block<4, 1>(0, 3) = avg_center;
+            }
+            ImGui::SameLine();
+            snprintf(b, 256, "rem_plane%d", i);
+            if (ImGui::Button(b)) {
+                calibration_planes.erase(calibration_planes.begin() + i);
+                break;
+            }
+            ImGui::SameLine();
+            snprintf(b, 256, "hv%d", i);
+            float* f = calibration_planes[i].size.data();
+            ImGui::SameLine();
+            snprintf(b, 256, "export plane %d", i);
+            if (ImGui::Button(b)) {
+
+                auto pcd1 = calib_struct::createTransformedPc(cloud1, extrinsic_calib_vec[0],encoder_offset[0]);
+                auto pcd2 = calib_struct::createTransformedPc(cloud2, extrinsic_calib_vec[1],encoder_offset[1]);
+                auto pcd3 = calib_struct::createTransformedPc(cloud_velo, extrinsic_calib_vec[2],encoder_offset[2]);
+
+                std::vector <pcl::PointCloud<pcl::PointXYZINormal>> pcds{ pcd1,pcd2, pcd3 };
+                pcl::io::savePCDFileBinary("test1_pcd.pcd", pcd1);
+                pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd2);
+                pcl::io::savePCDFileBinary("test2_pcd.pcd", pcd3);
+
+                auto plane_se3 = calibration_planes[i].matrix;
+                auto plane_size = calibration_planes[i].size;
+                auto plane_se3_inv = plane_se3.inverse();
+
+                Eigen::Vector3f plane_vec_inv = plane_se3_inv.block<1, 3>(1, 3);
+                for (int j = 0; j < pcds.size(); j++)
+                {
+                    auto& pcd = pcds[j];
+                    pcl::PointCloud<pcl::PointXYZL> cloud;
+                    cloud.reserve(cloud.size() + pcd.size());
+                    for (int i = 0; i < pcd.size(); i++) {
+                        //Eigen::Vector3f p = pcd[i].getArray3fMap() - plane_vec_inv;
+                        pcl::PointXYZL pi;
+                        pi.label = j;
+                        Eigen::Vector4f p = pcd[i].getArray4fMap();
+                        pi.getArray4fMap() = plane_se3_inv * p ;
+                        if (abs(pi.x) < plane_size.x() && abs(pi.y) < plane_size.y() && abs(pi.z) < 2.0) {
+                            cloud.push_back(pi);
+                        }
+
+                    }
+                    snprintf(b, 256, "cloud_plane%d_cloud%d.pcd", i,j);
+                    pcl::io::savePCDFileBinary(b, cloud);
+                }
+
+            }
+            ImGui::DragFloat2(b,f,0.1f);
+
 
         }
 

@@ -316,12 +316,18 @@ bool updateDrawingBufferWithColor(std::vector<float> &draw_buffer_cloud, std::ve
     draw_buffer_cloud.clear();
     draw_buffer_cloud_indices.clear();
 
+    draw_buffer_cloud.reserve(6*pc.size());
+    draw_buffer_cloud_indices.reserve(pc.size());
     std::cout << "sphere_odometry " << std::endl;
     std::cout << sphere_odometry << std::endl;
-    for (const auto p: pc)
+    for (const auto& p: pc)
     {
 
-        draw_buffer_cloud.insert(draw_buffer_cloud.end(), { p.x,p.y,p.z });
+        draw_buffer_cloud.push_back(p.x);
+        draw_buffer_cloud.push_back(p.y);
+        draw_buffer_cloud.push_back(p.z);
+
+//        draw_buffer_cloud.insert(draw_buffer_cloud.end(), { p.x,p.y,p.z });
         if (!sphere.empty())
         {
             Eigen::Matrix<double,1,4> pt{p.x,p.y,p.z,1.0};
@@ -339,14 +345,25 @@ bool updateDrawingBufferWithColor(std::vector<float> &draw_buffer_cloud, std::ve
             if (xx2>0 && yy2>0 && xx2 <sphere.cols && yy2 < sphere.rows)
             {
                 const auto pix = sphere.at<cv::Vec3b>(yy2,xx2);
-                draw_buffer_cloud.insert(draw_buffer_cloud.end(), {(1.0f*pix[2])/256.0f, (1.0f*pix[1])/256.0f, (1.0f*pix[0])/256.0f});
+//                draw_buffer_cloud.insert(draw_buffer_cloud.end(), {(1.0f*pix[2])/256.0f, (1.0f*pix[1])/256.0f, (1.0f*pix[0])/256.0f});
+                draw_buffer_cloud.push_back((1.0f*pix[2])/256.0f);
+                draw_buffer_cloud.push_back((1.0f*pix[1])/256.0f);
+                draw_buffer_cloud.push_back((1.0f*pix[0])/256.0f);
+
             }
         }
         else {
-            draw_buffer_cloud.insert(draw_buffer_cloud.end(), {1.0f * p.r / 255, 1.0f * p.g / 255, 1.0f * p.g / 255});
+//            draw_buffer_cloud.insert(draw_buffer_cloud.end(), {1.0f * p.r / 255, 1.0f * p.g / 255, 1.0f * p.g / 255});
+            draw_buffer_cloud.push_back(1.0f * p.r / 255);
+            draw_buffer_cloud.push_back(1.0f * p.g / 255);
+            draw_buffer_cloud.push_back(1.0f * p.b / 255);
+
         }
+
         draw_buffer_cloud_indices.push_back(draw_buffer_cloud_indices.size());
-    }
+    };
+    std::cout << "Done updateDrawingBufferWithColor" << std::endl;
+    return true;
 }
 int main(int argc, char **argv) {
 
